@@ -1,0 +1,103 @@
+@model IEnumerable<CarnetQRPlatform.Domain.Entities.EventRecord>
+@{
+    ViewData["Title"] = "Eventos";
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-calendar-alt me-2"></i>
+            Gestión de Eventos
+        </h3>
+        <div class="card-tools">
+            <a asp-action="Create" class="btn btn-light btn-sm">
+                <i class="fas fa-plus"></i> Nuevo Evento
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <table id="eventsTable" class="table table-bordered table-striped">
+            <thead>
+                <tr><th>Entidad</th><th>Fecha Programada</th><th>Estado</th><th>Notas</th><th>Acciones</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@($"{item.EntityProfile?.FirstName} {item.EntityProfile?.LastName}")</td>
+                        <td>@item.ScheduledAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @switch (item.Status)
+                            {
+                                case CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled:
+                                    <span class="badge bg-warning">Programado</span>
+                                    break;
+                                case CarnetQRPlatform.Domain.Entities.EventStatus.Completed:
+                                    <span class="badge bg-success">Completado</span>
+                                    break;
+                                case CarnetQRPlatform.Domain.Entities.EventStatus.NotCompleted:
+                                    <span class="badge bg-danger">No Completado</span>
+                                    break;
+                            }
+                        </td>
+                        <td>@(item.Notes ?? "-")</td>
+                        <td>
+                            @if (item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled && item.ScheduledAt <= DateTime.UtcNow)
+                            {
+                                <form asp-action="UpdateStatus" method="post" class="d-inline form-update-status" data-status="Completed">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <input type="hidden" name="status" value="@CarnetQRPlatform.Domain.Entities.EventStatus.Completed" />
+                                    <button type="submit" class="btn btn-sm btn-success" title="Marcar como Completado">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
+                                <form asp-action="UpdateStatus" method="post" class="d-inline form-update-status" data-status="NotCompleted">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <input type="hidden" name="status" value="@CarnetQRPlatform.Domain.Entities.EventStatus.NotCompleted" />
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Marcar como No Completado">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#eventsTable').DataTable({
+                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+                "responsive": true,
+                "pageLength": 25
+            });
+
+            // Actualizar estado de evento con AJAX
+            $('.form-update-status').on('submit', function(e) {
+                e.preventDefault();
+                var form = this;
+                var status = $(form).data('status');
+                var statusText = status === 'Completed' ? 'Completado' : 'No Completado';
+                
+                showConfirm('¿Actualizar estado?', '¿Desea marcar este evento como ' + statusText + '?', 'Sí, actualizar', 'Cancelar')
+                    .then((result) => {
+                        if (result.isConfirmed) {
+                            submitFormAjax(form, {
+                                loadingMessage: 'Actualizando estado...',
+                                successMessage: 'Estado actualizado exitosamente',
+                                successCallback: function() {
+                                    location.reload();
+                                }
+                            });
+                        }
+                    });
+            });
+        });
+    </script>
+}
+

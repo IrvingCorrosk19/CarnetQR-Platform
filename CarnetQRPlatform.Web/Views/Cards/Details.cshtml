@@ -1,0 +1,21 @@
+@model CarnetQRPlatform.Domain.Entities.Card
+@{
+    ViewData["Title"] = "Detalle de Carnet";
+}
+
+<div class="card">
+    <div class="card-header"><h3 class="card-title">Detalle de Carnet</h3></div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Número de Carnet:</dt><dd class="col-sm-9"><strong>@Model.CardNumber</strong></dd>
+            <dt class="col-sm-3">Token QR:</dt><dd class="col-sm-9"><code>@Model.QrToken</code></dd>
+            <dt class="col-sm-3">Entidad:</dt><dd class="col-sm-9">@($"{Model.EntityProfile?.FirstName} {Model.EntityProfile?.LastName}")</dd>
+            <dt class="col-sm-3">Fecha Emisión:</dt><dd class="col-sm-9">@Model.IssuedAt.ToString("dd/MM/yyyy HH:mm")</dd>
+            <dt class="col-sm-3">Estado:</dt><dd class="col-sm-9"><span class="badge bg-@(Model.IsActive ? "success" : "secondary")">@(Model.IsActive ? "Activo" : "Inactivo")</span></dd>
+        </dl>
+        <div class="mt-3">
+            <a href="@Url.Action("Index", "Cards")" class="btn btn-secondary">Volver</a>
+        </div>
+    </div>
+</div>
+

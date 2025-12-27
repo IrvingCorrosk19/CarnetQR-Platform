@@ -1,0 +1,2 @@
+SuperAdmin: admin@qlservices.com / Admin@123456
+Demo Admin: admin@demo.com / Admin@123456

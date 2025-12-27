@@ -1,0 +1,72 @@
+@model CarnetQRPlatform.Domain.Entities.EventRecord
+@{
+    ViewData["Title"] = "Nuevo Evento";
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-calendar-plus me-2"></i>
+            Nuevo Evento
+        </h3>
+    </div>
+    <form asp-action="Create" method="post" id="createEventForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            
+            <div class="form-group mb-4">
+                <label class="form-label">Entidad</label>
+                @if (Model.EntityProfileId != Guid.Empty)
+                {
+                    <input type="hidden" asp-for="EntityProfileId" />
+                    <input type="text" class="form-control" value="Seleccionada desde la lista" readonly />
+                }
+                else
+                {
+                    <select asp-for="EntityProfileId" class="form-select" required>
+                        <option value="">-- Seleccione una entidad --</option>
+                        @* Las opciones se cargarán dinámicamente o se pasarán por ViewBag *@
+                    </select>
+                    <span asp-validation-for="EntityProfileId" class="text-danger"></span>
+                }
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="ScheduledAt" class="form-label">Fecha y Hora Programada</label>
+                <input asp-for="ScheduledAt" type="datetime-local" class="form-control" required />
+                <span asp-validation-for="ScheduledAt" class="text-danger"></span>
+                <small class="form-text text-muted">Seleccione la fecha y hora en que se realizará el evento.</small>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="Notes" class="form-label">Notas</label>
+                <textarea asp-for="Notes" class="form-control" rows="4" placeholder="Información adicional sobre el evento"></textarea>
+                <span asp-validation-for="Notes" class="text-danger"></span>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Crear Evento
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            $('#createEventForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Creando evento...',
+                    successMessage: 'Evento creado exitosamente'
+                });
+            });
+        });
+    </script>
+}

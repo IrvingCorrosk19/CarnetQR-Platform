@@ -1,0 +1,102 @@
+@model IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>
+@{
+    ViewData["Title"] = "Empresas";
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-building me-2"></i>
+            Gestión de Empresas
+        </h3>
+        <div class="card-tools">
+            <a asp-action="Create" class="btn btn-light btn-sm">
+                <i class="fas fa-plus"></i> Nueva Empresa
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <table id="institutionsTable" class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Prefijo</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th style="width: 200px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Name</td>
+                        <td>@(item.Description ?? "-")</td>
+                        <td><span class="badge bg-info">@item.CardPrefix</span></td>
+                        <td>@(item.InstitutionType ?? "-")</td>
+                        <td>
+                            @if (item.IsActive)
+                            {
+                                <span class="badge bg-success">Activa</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactiva</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
+                                    <i class="fas fa-edit me-1"></i> Editar
+                                </a>
+                                <form asp-action="ToggleActive" asp-route-id="@item.Id" method="post" class="d-inline form-toggle-active">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-warning" : "btn-success")" title="@(item.IsActive ? "Desactivar" : "Activar")">
+                                        <i class="fas fa-@(item.IsActive ? "ban" : "check") me-1"></i>
+                                        @(item.IsActive ? "Desactivar" : "Activar")
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#institutionsTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
+                },
+                "responsive": true,
+                "pageLength": 25
+            });
+
+            // Toggle active con AJAX
+            $('.form-toggle-active').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Actualizando estado...',
+                    successMessage: 'Estado actualizado exitosamente',
+                    successCallback: function() {
+                        location.reload();
+                    }
+                });
+            });
+        });
+    </script>
+}
+

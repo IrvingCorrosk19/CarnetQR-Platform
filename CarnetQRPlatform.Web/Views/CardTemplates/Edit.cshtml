@@ -1,0 +1,295 @@
+@model CarnetQRPlatform.Domain.Entities.CardTemplate
+@{
+    ViewData["Title"] = "Editar Plantilla";
+    var availableFields = new List<string> 
+    { 
+        "IdentificationNumber", 
+        "FirstName", 
+        "LastName", 
+        "Email", 
+        "Phone", 
+        "DateOfBirth" 
+    };
+    var selectedFields = Model.VisibleFields ?? new List<string>();
+    var institution = Model.Institution;
+}
+
+<div class="card fade-in">
+    <div class="card-header p-0 pt-1" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
+        <ul class="nav nav-tabs" id="templateTabs" role="tablist" style="border-bottom: none; padding: 0 1.5rem;">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">
+                    <i class="fas fa-cog"></i> General
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="logo-tab" data-bs-toggle="tab" data-bs-target="#logo" type="button" role="tab">
+                    <i class="fas fa-image"></i> Logo
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="fields-tab" data-bs-toggle="tab" data-bs-target="#fields" type="button" role="tab">
+                    <i class="fas fa-list"></i> Campos Visibles
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="template-tab" data-bs-toggle="tab" data-bs-target="#template" type="button" role="tab">
+                    <i class="fas fa-code"></i> Plantilla HTML
+                </button>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <form asp-action="Edit" method="post" id="editForm">
+            @Html.AntiForgeryToken()
+            <input asp-for="Id" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="tab-content" id="templateTabsContent">
+                <!-- Tab General -->
+                <div class="tab-pane fade show active" id="general" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="Name" class="form-label">Nombre de la Plantilla</label>
+                                <input asp-for="Name" class="form-control" required />
+                                <span asp-validation-for="Name" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">Estado</label>
+                                <div class="form-check mt-2">
+                                    <input asp-for="PhotoEnabled" class="form-check-input" type="checkbox" />
+                                    <label asp-for="PhotoEnabled" class="form-check-label">
+                                        Habilitar foto en el carnet
+                                    </label>
+                                </div>
+                                <div class="form-check mt-2">
+                                    <input asp-for="IsDefault" class="form-check-input" type="checkbox" />
+                                    <label asp-for="IsDefault" class="form-check-label">
+                                        Marcar como plantilla predeterminada
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Logo -->
+                <div class="tab-pane fade" id="logo" role="tabpanel">
+                    <div class="form-group mb-3">
+                        <label class="form-label">Logo Institucional</label>
+                        @if (institution != null && !string.IsNullOrEmpty(institution.LogoPath))
+                        {
+                            <div class="mb-3">
+                                <img src="@institution.LogoPath" alt="Logo" style="max-height: 150px; max-width: 300px;" class="img-thumbnail" />
+                            </div>
+                        }
+                        <form asp-action="UploadLogo" method="post" enctype="multipart/form-data" id="logoForm" class="swal-submit">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="templateId" value="@Model.Id" />
+                            <div class="input-group">
+                                <input type="file" name="logoFile" class="form-control" accept="image/*" required />
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-upload"></i> Subir Logo
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">Formatos permitidos: JPG, PNG, GIF, SVG. Tamaño máximo: 5MB</small>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Tab Campos Visibles -->
+                <div class="tab-pane fade" id="fields" role="tabpanel">
+                    <div class="form-group mb-3">
+                        <label class="form-label">Campos Visibles (máximo 6)</label>
+                        <p class="text-muted">Seleccione y ordene los campos que se mostrarán en el carnet. Puede arrastrar para reordenar.</p>
+                        <ul id="sortableFields" class="list-group">
+                            @foreach (var field in availableFields)
+                            {
+                                var isSelected = selectedFields.Contains(field);
+                                <li class="list-group-item" data-field="@field">
+                                    <div class="form-check">
+                                        <input class="form-check-input field-checkbox" type="checkbox" 
+                                               value="@field" 
+                                               id="field_@field"
+                                               @(isSelected ? "checked" : "") />
+                                        <label class="form-check-label" for="field_@field" style="cursor: move;">
+                                            <i class="fas fa-grip-vertical text-muted me-2"></i>
+                                            @(field == "IdentificationNumber" ? "Número de Identificación" :
+                                              field == "FirstName" ? "Nombre" :
+                                              field == "LastName" ? "Apellido" :
+                                              field == "Email" ? "Email" :
+                                              field == "Phone" ? "Teléfono" :
+                                              field == "DateOfBirth" ? "Fecha de Nacimiento" : field)
+                                        </label>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                        <div id="fieldLimitMessage" class="text-danger mt-2" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i> Máximo 6 campos permitidos.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Plantilla HTML -->
+                <div class="tab-pane fade" id="template" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="TemplateHtml" class="form-label">Editor HTML</label>
+                                <textarea asp-for="TemplateHtml" class="form-control" rows="15" id="templateEditor"
+                                          placeholder="<div class='card-template'>
+    <div class='card-header'>
+        <h3>{{CardNumber}}</h3>
+    </div>
+    <div class='card-body'>
+        <p><strong>{{FirstName}} {{LastName}}</strong></p>
+        <p>{{Email}}</p>
+    </div>
+</div>"></textarea>
+                                <small class="form-text text-muted">
+                                    Variables disponibles: {{CardNumber}}, {{IdentificationNumber}}, {{FirstName}}, {{LastName}}, {{Email}}, {{Phone}}, {{DateOfBirth}}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label">Vista Previa</label>
+                                <div id="previewContainer" class="border p-3 bg-light" style="min-height: 300px;">
+                                    <p class="text-muted">La vista previa aparecerá aquí</p>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="updatePreview()">
+                                    <i class="fas fa-eye"></i> Actualizar Vista Previa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+                <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            var maxFields = 6;
+            var checkboxes = $('.field-checkbox');
+            
+            // Limitar campos seleccionados
+            checkboxes.on('change', function() {
+                var checkedCount = checkboxes.filter(':checked').length;
+                
+                if (checkedCount > maxFields) {
+                    $(this).prop('checked', false);
+                    $('#fieldLimitMessage').show().fadeOut(3000);
+                    return false;
+                }
+            });
+
+            // Hacer campos ordenables
+            var sortableFields = document.getElementById('sortableFields');
+            if (sortableFields) {
+                new Sortable(sortableFields, {
+                    animation: 150,
+                    handle: '.fa-grip-vertical',
+                    filter: '.field-checkbox',
+                    preventOnFilter: false
+                });
+            }
+
+            // Vista previa del template
+            updatePreview();
+        });
+
+        function collectVisibleFields() {
+            var checkedFields = [];
+            $('#sortableFields .field-checkbox:checked').each(function() {
+                checkedFields.push($(this).val());
+            });
+            // Crear inputs hidden para los campos seleccionados (ordenados según su posición)
+            $('#editForm input[name="VisibleFields"]').remove();
+            checkedFields.forEach(function(field) {
+                $('#editForm').append('<input type="hidden" name="VisibleFields" value="' + field + '" />');
+            });
+        }
+
+        // Ejecutar antes del submit del formulario
+        $('#editForm').on('submit', function(e) {
+            e.preventDefault();
+            collectVisibleFields();
+            submitFormAjax(this, {
+                loadingMessage: 'Actualizando plantilla...',
+                successMessage: 'Plantilla actualizada exitosamente'
+            });
+        });
+
+        // Submit logo form con AJAX
+        $('#logoForm').on('submit', function(e) {
+            e.preventDefault();
+            submitFormAjax(this, {
+                loadingMessage: 'Subiendo logo...',
+                successMessage: 'Logo subido exitosamente',
+                successCallback: function(response) {
+                    if (response.logoPath) {
+                        location.reload(); // Recargar para mostrar el nuevo logo
+                    }
+                }
+            });
+        });
+
+        function updatePreview() {
+            var templateHtml = $('#templateEditor').val();
+            if (!templateHtml || templateHtml.trim() === '') {
+                $('#previewContainer').html('<p class="text-muted">Ingrese HTML para ver la vista previa</p>');
+                return;
+            }
+
+            // Reemplazar variables con datos de ejemplo
+            var previewHtml = templateHtml
+                .replace(/\{\{CardNumber\}\}/g, 'DEMO001')
+                .replace(/\{\{IdentificationNumber\}\}/g, '1234567890')
+                .replace(/\{\{FirstName\}\}/g, 'Juan')
+                .replace(/\{\{LastName\}\}/g, 'Pérez')
+                .replace(/\{\{Email\}\}/g, 'juan.perez@ejemplo.com')
+                .replace(/\{\{Phone\}\}/g, '+507 1234-5678')
+                .replace(/\{\{DateOfBirth\}\}/g, '01/01/1990');
+
+            $('#previewContainer').html(previewHtml);
+        }
+
+        // Actualizar vista previa al escribir
+        $('#templateEditor').on('input', function() {
+            clearTimeout(window.previewTimeout);
+            window.previewTimeout = setTimeout(updatePreview, 500);
+        });
+    </script>
+}
+

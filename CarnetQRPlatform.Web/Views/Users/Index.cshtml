@@ -1,0 +1,115 @@
+@model IEnumerable<CarnetQRPlatform.Domain.Entities.AppUser>
+@{
+    ViewData["Title"] = "Usuarios";
+    var usersWithRoles = ViewBag.UsersWithRoles as List<dynamic>;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-users me-2"></i>
+            Gestión de Usuarios
+        </h3>
+        <div class="card-tools">
+            <a asp-action="Create" class="btn btn-light btn-sm">
+                <i class="fas fa-plus"></i> Nuevo Usuario
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <table id="usersTable" class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Rol</th>
+                    <th>Empresa</th>
+                    <th>Estado</th>
+                    <th>Último Login</th>
+                    <th style="width: 200px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    var userWithRole = usersWithRoles?.FirstOrDefault(u => ((dynamic)u).User.Id == item.Id);
+                    var roles = userWithRole != null ? ((dynamic)userWithRole).Roles as List<string> : new List<string>();
+                    var roleDisplay = (roles != null && roles.Any()) ? string.Join(", ", roles) : "Sin rol";
+                    
+                    <tr>
+                        <td>@($"{item.FirstName} {item.LastName}")</td>
+                        <td>@item.Email</td>
+                        <td>
+                            @if (roles != null)
+                            {
+                                @foreach (var role in roles)
+                                {
+                                    <span class="badge bg-primary me-1">@role</span>
+                                }
+                            }
+                        </td>
+                        <td>@(item.Institution?.Name ?? "-")</td>
+                        <td>
+                            @if (item.IsActive)
+                            {
+                                <span class="badge bg-success">Activo</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactivo</span>
+                            }
+                        </td>
+                        <td>@(item.LastLoginAt?.ToString("dd/MM/yyyy HH:mm") ?? "Nunca")</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <form asp-action="ToggleActive" method="post" class="d-inline form-toggle-active">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-warning" : "btn-success")" title="@(item.IsActive ? "Desactivar" : "Activar")">
+                                        <i class="fas fa-@(item.IsActive ? "ban" : "check") me-1"></i>
+                                        @(item.IsActive ? "Desactivar" : "Activar")
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#usersTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
+                },
+                "responsive": true,
+                "pageLength": 25
+            });
+
+            // Toggle active con AJAX
+            $('.form-toggle-active').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Actualizando estado...',
+                    successMessage: 'Estado actualizado exitosamente',
+                    successCallback: function() {
+                        location.reload();
+                    }
+                });
+            });
+        });
+    </script>
+}
+

@@ -1,0 +1,186 @@
+@model IEnumerable<CarnetQRPlatform.Domain.Entities.EntityProfile>
+@{
+    ViewData["Title"] = "Entidades";
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-users me-2"></i>
+            Gestión de Entidades
+        </h3>
+        <div class="card-tools">
+            <a asp-action="Create" class="btn btn-light btn-sm">
+                <i class="fas fa-plus"></i> Nueva Entidad
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <table id="entitiesTable" class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Identificación</th>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Estado</th>
+                    <th style="width: 280px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@(item.IdentificationNumber ?? "-")</td>
+                        <td>@($"{item.FirstName} {item.LastName}")</td>
+                        <td>@(item.Email ?? "-")</td>
+                        <td>@(item.Phone ?? "-")</td>
+                        <td>
+                            @if (item.IsActive)
+                            {
+                                <span class="badge bg-success">Activo</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactivo</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm" title="Ver detalles">
+                                    <i class="fas fa-eye me-1"></i> Ver
+                                </a>
+                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
+                                    <i class="fas fa-edit me-1"></i> Editar
+                                </a>
+                                <button type="button" class="btn btn-danger btn-sm delete-entity-btn" data-id="@item.Id" data-name="@($"{item.FirstName} {item.LastName}")" title="Eliminar">
+                                    <i class="fas fa-trash me-1"></i> Eliminar
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    @Html.AntiForgeryToken()
+    <script>
+        $(document).ready(function () {
+            $('#entitiesTable').DataTable({
+                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+                "responsive": true,
+                "pageLength": 25
+            });
+
+            // Manejar eliminación de entidades
+            $(document).on('click', '.delete-entity-btn', function() {
+                console.log('=== FRONTEND: Delete button clicked ===');
+                var entityId = $(this).data('id');
+                var entityName = $(this).data('name');
+                console.log('Entity ID:', entityId);
+                console.log('Entity Name:', entityName);
+                
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    html: `¿Deseas eliminar la entidad <strong>${entityName}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    showLoaderOnConfirm: true,
+                    preConfirm: function() {
+                        return new Promise(function(resolve, reject) {
+                            console.log('=== FRONTEND: Starting AJAX request ===');
+                            var token = $('input[name="__RequestVerificationToken"]').val();
+                            console.log('Token found:', token ? 'Yes' : 'No');
+                            console.log('URL:', '@Url.Action("Delete", "EntityProfiles")');
+                            
+                            $.ajax({
+                                url: '@Url.Action("Delete", "EntityProfiles")',
+                                type: 'POST',
+                                data: {
+                                    id: entityId,
+                                    __RequestVerificationToken: token
+                                },
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                beforeSend: function() {
+                                    console.log('=== FRONTEND: AJAX beforeSend ===');
+                                },
+                                success: function(response) {
+                                    console.log('=== FRONTEND DELETE SUCCESS ===');
+                                    console.log('Response:', response);
+                                    console.log('Response type:', typeof response);
+                                    console.log('Response.success:', response.success);
+                                    console.log('Response.message:', response.message);
+                                    console.log('=============================');
+                                    
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: '¡Eliminado!',
+                                            text: response.message || 'Entidad eliminada exitosamente.',
+                                            timer: 2000,
+                                            showConfirmButton: false
+                                        }).then(function() {
+                                            if (response.redirectUrl) {
+                                                window.location.href = response.redirectUrl;
+                                            } else {
+                                                window.location.reload();
+                                            }
+                                        });
+                                    } else {
+                                        console.log('Response indicates failure');
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: response.message || 'No se pudo eliminar la entidad.'
+                                        });
+                                    }
+                                    resolve();
+                                },
+                                error: function(xhr, status, error) {
+                                    console.error('=== FRONTEND DELETE ERROR ===');
+                                    console.error('Status:', status);
+                                    console.error('Error:', error);
+                                    console.error('Status Code:', xhr.status);
+                                    console.error('Status Text:', xhr.statusText);
+                                    console.error('XHR Response:', xhr.responseText);
+                                    console.error('XHR Response Type:', xhr.responseJSON ? 'JSON' : 'Text');
+                                    if (xhr.responseJSON) {
+                                        console.error('Response JSON:', xhr.responseJSON);
+                                    }
+                                    console.error('===========================');
+                                    
+                                    var errorMsg = 'Ocurrió un error al eliminar la entidad.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errorMsg = xhr.responseJSON.message;
+                                        console.log('Error message from server:', errorMsg);
+                                    }
+                                    
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: errorMsg
+                                    });
+                                    reject(error);
+                                },
+                                complete: function() {
+                                    console.log('=== FRONTEND: AJAX complete ===');
+                                }
+                            });
+                        });
+                    },
+                    allowOutsideClick: function() { return !Swal.isLoading(); }
+                });
+            });
+        });
+    </script>
+}
+

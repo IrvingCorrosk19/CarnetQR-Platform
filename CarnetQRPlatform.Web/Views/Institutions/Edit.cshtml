@@ -1,0 +1,104 @@
+@model CarnetQRPlatform.Domain.Entities.Institution
+@{
+    ViewData["Title"] = "Editar Empresa";
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-edit me-2"></i>
+            Editar Empresa
+        </h3>
+    </div>
+    <form asp-action="Edit" method="post" id="editInstitutionForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Name" class="form-label">Nombre de la Empresa</label>
+                        <input asp-for="Name" class="form-control" placeholder="Ingrese el nombre de la empresa" required />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="CardPrefix" class="form-label">Prefijo de Carnet</label>
+                        <input asp-for="CardPrefix" class="form-control" maxlength="10" readonly />
+                        <span asp-validation-for="CardPrefix" class="text-danger"></span>
+                        <small class="form-text text-muted">El prefijo no puede modificarse después de crear la empresa.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="Description" class="form-label">Descripción</label>
+                <textarea asp-for="Description" class="form-control" rows="3" placeholder="Descripción de la empresa"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group mb-4">
+                        <label asp-for="Email" class="form-label">Correo Electrónico</label>
+                        <input asp-for="Email" type="email" class="form-control" placeholder="correo@empresa.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-4">
+                        <label asp-for="Phone" class="form-label">Teléfono</label>
+                        <input asp-for="Phone" class="form-control" placeholder="+507 1234-5678" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-4">
+                        <label asp-for="InstitutionType" class="form-label">Tipo de Empresa</label>
+                        <input asp-for="InstitutionType" class="form-control" placeholder="Ej: Clínica, Escuela, etc." />
+                        <span asp-validation-for="InstitutionType" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="Address" class="form-label">Dirección</label>
+                <input asp-for="Address" class="form-control" placeholder="Dirección completa" />
+                <span asp-validation-for="Address" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-4">
+                <div class="form-check">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                    <label asp-for="IsActive" class="form-check-label">Empresa Activa</label>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            $('#editInstitutionForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Actualizando empresa...',
+                    successMessage: 'Empresa actualizada exitosamente'
+                });
+            });
+        });
+    </script>
+}

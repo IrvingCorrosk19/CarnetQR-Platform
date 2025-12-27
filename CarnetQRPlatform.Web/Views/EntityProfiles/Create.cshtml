@@ -1,0 +1,156 @@
+@model CarnetQRPlatform.Domain.Entities.EntityProfile
+@using CarnetQRPlatform.Domain.Constants
+@{
+    ViewData["Title"] = "Nueva Entidad";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-user-plus me-2"></i>
+            Nueva Entidad
+        </h3>
+    </div>
+    <form asp-action="Create" method="post" id="createEntityForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            @if (!isSuperAdmin)
+            {
+                <input type="hidden" asp-for="InstitutionId" value="@Guid.Empty" />
+            }
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            
+            @* Selector de empresa solo para SuperAdmin *@
+            @if (isSuperAdmin && institutions != null)
+            {
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label asp-for="InstitutionId" class="form-label">Empresa <span class="text-danger">*</span></label>
+                            <select asp-for="InstitutionId" class="form-select" required>
+                                <option value="">-- Seleccione una empresa --</option>
+                                @foreach (var institution in institutions)
+                                {
+                                    <option value="@institution.Id">@institution.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="InstitutionId" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            }
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="IdentificationNumber" class="form-label">Número de Identificación</label>
+                        <input asp-for="IdentificationNumber" class="form-control" placeholder="Ingrese el número de identificación" />
+                        <span asp-validation-for="IdentificationNumber" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="FirstName" class="form-label">Nombre</label>
+                        <input asp-for="FirstName" class="form-control" placeholder="Ingrese el nombre" required />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="LastName" class="form-label">Apellido</label>
+                        <input asp-for="LastName" class="form-control" placeholder="Ingrese el apellido" required />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Email" class="form-label">Correo Electrónico</label>
+                        <input asp-for="Email" type="email" class="form-control" placeholder="correo@ejemplo.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Phone" class="form-label">Teléfono</label>
+                        <input asp-for="Phone" class="form-control" placeholder="+507 1234-5678" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="DateOfBirth" class="form-label">Fecha de Nacimiento</label>
+                        <input asp-for="DateOfBirth" type="date" class="form-control" />
+                        <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group mb-4">
+                <div class="form-check">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
+                    <label asp-for="IsActive" class="form-check-label">Entidad Activa</label>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Crear Entidad
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            $('#createEntityForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                var form = this;
+                var formData = new FormData(form);
+                
+                // Log frontend - datos del formulario
+                console.log('=== FRONTEND LOG: Create EntityProfile ===');
+                console.log('Form action:', $(form).attr('action'));
+                console.log('Form method:', $(form).attr('method'));
+                
+                // Log todos los campos del formulario
+                var formDataObj = {};
+                for (var pair of formData.entries()) {
+                    formDataObj[pair[0]] = pair[1];
+                    console.log('Form field:', pair[0], '=', pair[1]);
+                }
+                console.log('InstitutionId value:', formDataObj['InstitutionId']);
+                console.log('==========================================');
+                
+                submitFormAjax(this, {
+                    loadingMessage: 'Creando entidad...',
+                    successMessage: 'Entidad creada exitosamente',
+                    redirectUrl: '@Url.Action("Index", "EntityProfiles")',
+                    successCallback: function(response) {
+                        console.log('=== FRONTEND SUCCESS LOG ===');
+                        console.log('Success response:', response);
+                        console.log('===========================');
+                    },
+                    errorCallback: function(response) {
+                        console.error('=== FRONTEND ERROR LOG ===');
+                        console.error('Error response:', response);
+                        console.error('==========================');
+                    }
+                });
+            });
+        });
+    </script>
+}

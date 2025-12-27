@@ -1,0 +1,45 @@
+@model IEnumerable<CarnetQRPlatform.Domain.Entities.Card>
+@{
+    ViewData["Title"] = "Carnets";
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-id-card me-2"></i>
+            Gestión de Carnets
+        </h3>
+    </div>
+    <div class="card-body">
+        <table id="cardsTable" class="table table-bordered table-striped">
+            <thead>
+                <tr><th>Número</th><th>Entidad</th><th>Token QR</th><th>Fecha Emisión</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.CardNumber</td>
+                        <td>@($"{item.EntityProfile?.FirstName} {item.EntityProfile?.LastName}")</td>
+                        <td><code>@item.QrToken</code></td>
+                        <td>@item.IssuedAt.ToString("dd/MM/yyyy")</td>
+                        <td><span class="badge bg-@(item.IsActive ? "success" : "secondary")">@(item.IsActive ? "Activo" : "Inactivo")</span></td>
+                        <td><a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-info"><i class="fas fa-eye"></i></a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#cardsTable').DataTable({
+                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+                "responsive": true,
+                "pageLength": 25
+            });
+        });
+    </script>
+}
+

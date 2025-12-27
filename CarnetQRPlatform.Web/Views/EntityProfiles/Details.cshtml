@@ -1,0 +1,74 @@
+@model CarnetQRPlatform.Domain.Entities.EntityProfile
+@{
+    ViewData["Title"] = "Detalle de Entidad";
+    var cards = ViewBag.Cards as IEnumerable<CarnetQRPlatform.Domain.Entities.Card> ?? Enumerable.Empty<CarnetQRPlatform.Domain.Entities.Card>();
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-user me-2"></i>
+            Detalle de Entidad
+        </h3>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Identificación:</dt><dd class="col-sm-9">@(Model.IdentificationNumber ?? "-")</dd>
+            <dt class="col-sm-3">Nombre:</dt><dd class="col-sm-9">@($"{Model.FirstName} {Model.LastName}")</dd>
+            <dt class="col-sm-3">Email:</dt><dd class="col-sm-9">@(Model.Email ?? "-")</dd>
+            <dt class="col-sm-3">Teléfono:</dt><dd class="col-sm-9">@(Model.Phone ?? "-")</dd>
+            <dt class="col-sm-3">Estado:</dt><dd class="col-sm-9"><span class="badge bg-@(Model.IsActive ? "success" : "secondary")">@(Model.IsActive ? "Activo" : "Inactivo")</span></dd>
+        </dl>
+        <div class="mt-3">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Editar</a>
+            <a asp-action="Index" class="btn btn-secondary">Volver</a>
+            <form asp-action="GenerateCard" asp-route-entityProfileId="@Model.Id" method="post" class="d-inline" id="generateCardForm">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-success">Generar Carnet</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3 fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-id-card me-2"></i>
+            Carnets Asociados
+        </h3>
+    </div>
+    <div class="card-body">
+        <table class="table table-bordered">
+            <thead><tr><th>Número</th><th>Token QR</th><th>Fecha Emisión</th><th>Estado</th></tr></thead>
+            <tbody>
+                @foreach (var card in cards)
+                {
+                    <tr>
+                        <td>@card.CardNumber</td>
+                        <td><code>@card.QrToken</code></td>
+                        <td>@card.IssuedAt.ToString("dd/MM/yyyy")</td>
+                        <td><span class="badge bg-@(card.IsActive ? "success" : "secondary")">@(card.IsActive ? "Activo" : "Inactivo")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $('#generateCardForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Generando carnet...',
+                    successMessage: 'Carnet generado exitosamente',
+                    successCallback: function() {
+                        location.reload(); // Recargar para mostrar el nuevo carnet
+                    }
+                });
+            });
+        });
+    </script>
+}
+

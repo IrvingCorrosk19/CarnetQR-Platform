@@ -1,0 +1,55 @@
+@{
+    ViewData["Title"] = "Estadísticas";
+}
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Total Programados</h5>
+                <h2>@ViewBag.TotalScheduled</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Total Completados</h5>
+                <h2 class="text-success">@ViewBag.TotalCompleted</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>No Completados</h5>
+                <h2 class="text-danger">@ViewBag.TotalNotCompleted</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>% Cumplimiento</h5>
+                <h2>@ViewBag.CompletionRate.ToString("F1")%</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Resumen General</h3></div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-6">Total Entidades:</dt><dd class="col-sm-6"><strong>@ViewBag.TotalEntities</strong></dd>
+                    <dt class="col-sm-6">Total Carnets:</dt><dd class="col-sm-6"><strong>@ViewBag.TotalCards</strong></dd>
+                    <dt class="col-sm-6">Eventos Programados:</dt><dd class="col-sm-6"><strong>@ViewBag.TotalScheduled</strong></dd>
+                    <dt class="col-sm-6">Tasa de Cumplimiento:</dt><dd class="col-sm-6"><strong>@ViewBag.CompletionRate.ToString("F1")%</strong></dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
