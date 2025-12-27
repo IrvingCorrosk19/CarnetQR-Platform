@@ -1,5 +1,6 @@
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Infrastructure.Data;
+using CarnetQRPlatform.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,17 +12,17 @@ public class QrController : Controller
 {
     private readonly ICardService _cardService;
     private readonly IEventService _eventService;
-    private readonly ICardTemplateService _templateService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<QrController> _logger;
+    private readonly QrCodeService _qrCodeService;
 
-    public QrController(ICardService cardService, IEventService eventService, ICardTemplateService templateService, ApplicationDbContext context, ILogger<QrController> logger)
+    public QrController(ICardService cardService, IEventService eventService, ApplicationDbContext context, ILogger<QrController> logger, QrCodeService qrCodeService)
     {
         _cardService = cardService;
         _eventService = eventService;
-        _templateService = templateService;
         _context = context;
         _logger = logger;
+        _qrCodeService = qrCodeService;
     }
 
     [HttpGet]
@@ -48,16 +49,16 @@ public class QrController : Controller
             .OrderByDescending(e => e.ScheduledAt)
             .Take(10);
 
-        // Obtener la plantilla de la institución del card (sin filtro de tenant para endpoint público)
-        var template = await _context.CardTemplates
-            .Include(t => t.Institution)
-            .Where(t => t.InstitutionId == card.InstitutionId)
-            .OrderByDescending(t => t.IsDefault)
-            .FirstOrDefaultAsync();
-
         ViewBag.UpcomingEvents = upcoming;
         ViewBag.HistoryEvents = history;
-        ViewBag.Template = template;
+
+        // Generar código QR para mostrar en la vista pública
+        var qrUrl = Url.Action("Show", "Qr", new { token = card.QrToken }, Request.Scheme) ?? 
+                   $"{Request.Scheme}://{Request.Host}/q/{card.QrToken}";
+        var qrCodeBase64 = _qrCodeService.GenerateQrCodeBase64(qrUrl, size: 250);
+        
+        ViewBag.QrUrl = qrUrl;
+        ViewBag.QrCodeBase64 = qrCodeBase64;
 
         return View(card);
     }

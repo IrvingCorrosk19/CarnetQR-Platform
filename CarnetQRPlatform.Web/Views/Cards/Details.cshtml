@@ -1,21 +1,290 @@
 @model CarnetQRPlatform.Domain.Entities.Card
 @{
     ViewData["Title"] = "Detalle de Carnet";
+    var qrUrl = ViewBag.QrUrl as string ?? Url.Action("Show", "Qr", new { token = Model.QrToken }, Context.Request.Scheme);
+    var qrCodeBase64 = ViewBag.QrCodeBase64 as string;
 }
 
-<div class="card">
-    <div class="card-header"><h3 class="card-title">Detalle de Carnet</h3></div>
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-id-card me-2"></i>
+            Detalle de Carnet
+        </h3>
+    </div>
     <div class="card-body">
-        <dl class="row">
-            <dt class="col-sm-3">Número de Carnet:</dt><dd class="col-sm-9"><strong>@Model.CardNumber</strong></dd>
-            <dt class="col-sm-3">Token QR:</dt><dd class="col-sm-9"><code>@Model.QrToken</code></dd>
-            <dt class="col-sm-3">Entidad:</dt><dd class="col-sm-9">@($"{Model.EntityProfile?.FirstName} {Model.EntityProfile?.LastName}")</dd>
-            <dt class="col-sm-3">Fecha Emisión:</dt><dd class="col-sm-9">@Model.IssuedAt.ToString("dd/MM/yyyy HH:mm")</dd>
-            <dt class="col-sm-3">Estado:</dt><dd class="col-sm-9"><span class="badge bg-@(Model.IsActive ? "success" : "secondary")">@(Model.IsActive ? "Activo" : "Inactivo")</span></dd>
-        </dl>
+        <div class="row">
+            <div class="col-md-6">
+                <dl class="row">
+                    <dt class="col-sm-4">Número de Carnet:</dt>
+                    <dd class="col-sm-8"><strong class="fs-5">@Model.CardNumber</strong></dd>
+                    
+                    <dt class="col-sm-4">Token QR:</dt>
+                    <dd class="col-sm-8"><code class="text-break">@Model.QrToken</code></dd>
+                    
+                    <dt class="col-sm-4">Entidad:</dt>
+                    <dd class="col-sm-8">@($"{Model.EntityProfile?.FirstName} {Model.EntityProfile?.LastName}")</dd>
+                    
+                    <dt class="col-sm-4">Empresa:</dt>
+                    <dd class="col-sm-8">@(Model.Institution?.Name ?? "-")</dd>
+                    
+                    <dt class="col-sm-4">Fecha Emisión:</dt>
+                    <dd class="col-sm-8">@Model.IssuedAt.ToString("dd/MM/yyyy HH:mm")</dd>
+                    
+                    <dt class="col-sm-4">Estado:</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge bg-@(Model.IsActive ? "success" : "secondary")">
+                            @(Model.IsActive ? "Activo" : "Inactivo")
+                        </span>
+                    </dd>
+                </dl>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-light">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>Código QR</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        @if (!string.IsNullOrEmpty(qrCodeBase64))
+                        {
+                            <div class="mb-3">
+                                <img src="@qrCodeBase64" alt="Código QR del Carnet" class="img-fluid" style="max-width: 300px; border: 2px solid #dee2e6; border-radius: 8px; padding: 10px; background: white;">
+                                <p class="text-muted small mt-2">Escanea este código para ver la información del carnet</p>
+                            </div>
+                        }
+                        <p class="mb-2"><strong>URL Pública:</strong></p>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control form-control-sm" id="qrUrlInput" value="@qrUrl" readonly>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copyQrUrl()">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                        <a href="@qrUrl" target="_blank" class="btn btn-primary btn-sm">
+                            <i class="fas fa-external-link-alt me-1"></i> Ver QR Público
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr class="my-4" />
+        
+        <!-- Vista de Tarjeta Física del Carnet -->
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Vista de Tarjeta del Carnet</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm" style="border: 2px solid #dee2e6; border-radius: 10px; padding: 20px; background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);">
+                            <div class="text-center mb-3">
+                                <h4 class="mb-0" style="font-weight: bold; color: #495057;">@(Model.Institution?.Name ?? "Empresa")</h4>
+                            </div>
+                            <hr style="border-top: 2px solid #dee2e6; margin: 15px 0;" />
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block">Número de Carnet</small>
+                                        <strong class="fs-5">@Model.CardNumber</strong>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Entidad</small>
+                                        <strong>@($"{Model.EntityProfile?.FirstName} {Model.EntityProfile?.LastName}")</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-center">
+                                    @if (!string.IsNullOrEmpty(qrCodeBase64))
+                                    {
+                                        <img src="@qrCodeBase64" alt="Código QR" style="max-width: 200px; border: 2px solid #dee2e6; border-radius: 8px; padding: 8px; background: white;">
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle me-2"></i>Información</h6>
+                            <p class="small mb-2">Esta es la vista previa de cómo se vería el carnet físico.</p>
+                            <p class="small mb-0">El código QR es escaneable y dirige a la información pública del carnet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="mt-3">
-            <a href="@Url.Action("Index", "Cards")" class="btn btn-secondary">Volver</a>
+            <a href="@Url.Action("Index", "Cards")" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Volver
+            </a>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#printConfigModal">
+                <i class="fas fa-print me-1"></i> Imprimir Carnet
+            </button>
+            <a href="@Url.Action("Print", "Carnet", new { cardNumber = Model.CardNumber })" target="_blank" class="btn btn-outline-primary">
+                <i class="fas fa-print me-1"></i> Imprimir Rápido
+            </a>
+        </div>
+        
+        <!-- Modal de Configuración de Impresión -->
+        <div class="modal fade" id="printConfigModal" tabindex="-1" aria-labelledby="printConfigModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="printConfigModalLabel">
+                            <i class="fas fa-cog me-2"></i>Configurar Impresión del Carnet
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="printConfigForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="mb-3"><i class="fas fa-ruler me-2"></i>Tamaño del Carnet</h6>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Ancho (mm)</label>
+                                        <input type="number" class="form-control" id="width" value="85.6" step="0.1" min="50" max="200">
+                                        <small class="text-muted">Tamaño estándar: 85.6mm (tarjeta horizontal)</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Alto (mm)</label>
+                                        <input type="number" class="form-control" id="height" value="54.0" step="0.1" min="30" max="150">
+                                        <small class="text-muted">Tamaño estándar: 54mm</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Orientación</label>
+                                        <select class="form-select" id="orientation">
+                                            <option value="horizontal" selected>Horizontal</option>
+                                            <option value="vertical">Vertical</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h6 class="mb-3"><i class="fas fa-eye me-2"></i>Elementos Visibles</h6>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showLogo" checked>
+                                        <label class="form-check-label" for="showLogo">
+                                            Mostrar Logo
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showInstitutionName" checked>
+                                        <label class="form-check-label" for="showInstitutionName">
+                                            Mostrar Nombre de la Institución
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showUserName" checked>
+                                        <label class="form-check-label" for="showUserName">
+                                            Mostrar Nombre del Usuario
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showCardNumber" checked>
+                                        <label class="form-check-label" for="showCardNumber">
+                                            Mostrar Número de Carnet
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showQrCode" checked>
+                                        <label class="form-check-label" for="showQrCode">
+                                            Mostrar Código QR
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showIdentificationNumber">
+                                        <label class="form-check-label" for="showIdentificationNumber">
+                                            Mostrar Número de Identificación
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showEmail">
+                                        <label class="form-check-label" for="showEmail">
+                                            Mostrar Email
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showPhone">
+                                        <label class="form-check-label" for="showPhone">
+                                            Mostrar Teléfono
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="openPrintWithConfig()">
+                            <i class="fas fa-print me-1"></i> Imprimir con Configuración
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        function copyQrUrl() {
+            var input = document.getElementById('qrUrlInput');
+            input.select();
+            input.setSelectionRange(0, 99999); // Para móviles
+            document.execCommand('copy');
+            
+            // Mostrar mensaje de éxito
+            Swal.fire({
+                icon: 'success',
+                title: 'Copiado',
+                text: 'URL copiada al portapapeles',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+
+        function openPrintWithConfig() {
+            var width = document.getElementById('width').value;
+            var height = document.getElementById('height').value;
+            var orientation = document.getElementById('orientation').value;
+            var showLogo = document.getElementById('showLogo').checked;
+            var showInstitutionName = document.getElementById('showInstitutionName').checked;
+            var showUserName = document.getElementById('showUserName').checked;
+            var showCardNumber = document.getElementById('showCardNumber').checked;
+            var showQrCode = document.getElementById('showQrCode').checked;
+            var showIdentificationNumber = document.getElementById('showIdentificationNumber').checked;
+            var showEmail = document.getElementById('showEmail').checked;
+            var showPhone = document.getElementById('showPhone').checked;
+            
+            var url = '@Url.Action("Print", "Carnet", new { cardNumber = Model.CardNumber })' +
+                '?width=' + width +
+                '&height=' + height +
+                '&orientation=' + orientation +
+                '&showLogo=' + showLogo +
+                '&showInstitutionName=' + showInstitutionName +
+                '&showUserName=' + showUserName +
+                '&showCardNumber=' + showCardNumber +
+                '&showQrCode=' + showQrCode +
+                '&showIdentificationNumber=' + showIdentificationNumber +
+                '&showEmail=' + showEmail +
+                '&showPhone=' + showPhone;
+            
+            window.open(url, '_blank');
+            
+            // Cerrar modal
+            var modal = bootstrap.Modal.getInstance(document.getElementById('printConfigModal'));
+            modal.hide();
+        }
+    </script>
+}
 

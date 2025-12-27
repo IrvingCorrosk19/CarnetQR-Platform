@@ -1,0 +1,333 @@
+@model CarnetQRPlatform.Web.Models.PrintCardViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Imprimir Carnet";
+    
+    var config = Model.Config;
+    var width = config.Orientation == "vertical" ? config.Height : config.Width;
+    var height = config.Orientation == "vertical" ? config.Width : config.Height;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"] - @Model.CardNumber</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Contenedor del carnet */
+        .carnet-container {
+            width: @(width)mm;
+            height: @(height)mm;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            padding: 6mm;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #667eea;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Decoración de fondo sutil */
+        .carnet-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Header con logo y nombre de institución */
+        .carnet-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5mm;
+            padding-bottom: 3mm;
+            border-bottom: 2px solid #667eea;
+            position: relative;
+            z-index: 1;
+        }
+
+        .carnet-logo {
+            max-width: 25mm;
+            max-height: 15mm;
+            object-fit: contain;
+        }
+
+        .carnet-institution-name {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #333;
+            text-align: right;
+            flex: 1;
+            margin-left: 4mm;
+        }
+
+        /* Cuerpo del carnet */
+        .carnet-body {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 4mm;
+        }
+
+        .carnet-info {
+            flex: 1;
+        }
+
+        .carnet-user-name {
+            font-size: 13pt;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 2mm;
+            line-height: 1.3;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .carnet-card-number {
+            font-size: 10pt;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 2mm;
+        }
+
+        .carnet-details {
+            font-size: 8pt;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .carnet-detail-item {
+            margin-bottom: 1mm;
+        }
+
+        .carnet-qr {
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .carnet-qr img {
+            width: 28mm;
+            height: 28mm;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            padding: 2mm;
+            background: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .carnet-qr-label {
+            font-size: 7pt;
+            color: #999;
+            margin-top: 2mm;
+        }
+
+        /* Footer */
+        .carnet-footer {
+            margin-top: auto;
+            padding-top: 2mm;
+            border-top: 1px solid #e0e0e0;
+            font-size: 7pt;
+            color: #999;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Botones de control (solo en pantalla) */
+        .print-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .print-controls button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-right: 10px;
+            transition: transform 0.2s;
+        }
+
+        .print-controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .print-controls button.secondary {
+            background: #6c757d;
+        }
+
+        /* Estilos para impresión */
+        @@media print {
+            body {
+                background: white;
+                padding: 0;
+                display: block;
+            }
+
+            .print-controls {
+                display: none !important;
+            }
+
+            .carnet-container {
+                margin: 0;
+                box-shadow: none;
+                border: 1px solid #ccc;
+                page-break-after: always;
+            }
+
+            @@page {
+                size: @(width)mm @(height)mm;
+                margin: 0;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+            }
+        }
+
+        /* Ajustes para orientación vertical */
+        @if (config.Orientation == "vertical") {
+            <text>
+            .carnet-body {
+                flex-direction: column;
+            }
+            
+            .carnet-qr {
+                align-self: center;
+            }
+            </text>
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <button onclick="window.print()">
+            <i class="fas fa-print"></i> Imprimir Carnet
+        </button>
+        <button class="secondary" onclick="window.close()">
+            <i class="fas fa-times"></i> Cerrar
+        </button>
+    </div>
+
+    <div class="carnet-container">
+        <!-- Header -->
+        @if (config.ShowLogo || config.ShowInstitutionName)
+        {
+            <div class="carnet-header">
+                @if (config.ShowLogo && !string.IsNullOrEmpty(Model.InstitutionLogoPath))
+                {
+                    <img src="@Model.InstitutionLogoPath" alt="Logo" class="carnet-logo">
+                }
+                @if (config.ShowInstitutionName)
+                {
+                    <div class="carnet-institution-name">@Model.InstitutionName</div>
+                }
+            </div>
+        }
+
+        <!-- Body -->
+        <div class="carnet-body">
+            <div class="carnet-info">
+                @if (config.ShowUserName)
+                {
+                    <div class="carnet-user-name">
+                        @Model.FirstName @Model.LastName
+                    </div>
+                }
+
+                @if (config.ShowCardNumber)
+                {
+                    <div class="carnet-card-number">
+                        Carnet: @Model.CardNumber
+                    </div>
+                }
+
+                <div class="carnet-details">
+                    @if (config.ShowIdentificationNumber && !string.IsNullOrEmpty(Model.IdentificationNumber))
+                    {
+                        <div class="carnet-detail-item">
+                            <strong>ID:</strong> @Model.IdentificationNumber
+                        </div>
+                    }
+
+                    @if (config.ShowEmail && !string.IsNullOrEmpty(Model.Email))
+                    {
+                        <div class="carnet-detail-item">
+                            <strong>Email:</strong> @Model.Email
+                        </div>
+                    }
+
+                    @if (config.ShowPhone && !string.IsNullOrEmpty(Model.Phone))
+                    {
+                        <div class="carnet-detail-item">
+                            <strong>Tel:</strong> @Model.Phone
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (config.ShowQrCode && !string.IsNullOrEmpty(Model.QrCodeBase64))
+            {
+                <div class="carnet-qr">
+                    <img src="@Model.QrCodeBase64" alt="Código QR">
+                    <div class="carnet-qr-label">Escanea para verificar</div>
+                </div>
+            }
+        </div>
+
+        <!-- Footer -->
+        <div class="carnet-footer">
+            Emitido: @Model.IssuedAt.ToString("dd/MM/yyyy")
+        </div>
+    </div>
+
+    <script>
+        // Auto-imprimir si se pasa el parámetro ?autoprint=true
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('autoprint') === 'true') {
+            window.onload = function() {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            };
+        }
+    </script>
+</body>
+</html>
+

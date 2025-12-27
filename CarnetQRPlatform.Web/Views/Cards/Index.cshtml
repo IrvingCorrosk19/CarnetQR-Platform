@@ -13,7 +13,7 @@
     <div class="card-body">
         <table id="cardsTable" class="table table-bordered table-striped">
             <thead>
-                <tr><th>Número</th><th>Entidad</th><th>Token QR</th><th>Fecha Emisión</th><th>Estado</th><th>Acciones</th></tr>
+                <tr><th>Número</th><th>Entidad</th><th>Token QR</th><th>Fecha Emisión</th><th>Estado</th><th style="width: 200px;">Acciones</th></tr>
             </thead>
             <tbody>
                 @foreach (var item in Model)
@@ -24,7 +24,20 @@
                         <td><code>@item.QrToken</code></td>
                         <td>@item.IssuedAt.ToString("dd/MM/yyyy")</td>
                         <td><span class="badge bg-@(item.IsActive ? "success" : "secondary")">@(item.IsActive ? "Activo" : "Inactivo")</span></td>
-                        <td><a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-info"><i class="fas fa-eye"></i></a></td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm" title="Ver detalles">
+                                    <i class="fas fa-eye me-1"></i> Ver
+                                </a>
+                                <form asp-action="ToggleActive" asp-route-id="@item.Id" method="post" class="d-inline form-toggle-active">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-warning" : "btn-success")" title="@(item.IsActive ? "Desactivar" : "Activar")">
+                                        <i class="fas fa-@(item.IsActive ? "ban" : "check") me-1"></i>
+                                        @(item.IsActive ? "Desactivar" : "Activar")
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -38,6 +51,51 @@
                 "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
                 "responsive": true,
                 "pageLength": 25
+            });
+
+            // Manejar desactivar/activar carnets
+            $(document).on('submit', '.form-toggle-active', function(e) {
+                e.preventDefault();
+                var form = $(this);
+                var button = form.find('button[type="submit"]');
+                var originalText = button.html();
+                
+                // Deshabilitar botón durante la petición
+                button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Procesando...');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: form.serialize(),
+                    success: function(response) {
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Éxito',
+                                text: response.message,
+                                timer: 2000,
+                                showConfirmButton: false
+                            }).then(function() {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'Error al cambiar el estado del carnet'
+                            });
+                            button.prop('disabled', false).html(originalText);
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Error al procesar la solicitud'
+                        });
+                        button.prop('disabled', false).html(originalText);
+                    }
+                });
             });
         });
     </script>

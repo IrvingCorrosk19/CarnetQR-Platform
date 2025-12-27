@@ -43,6 +43,19 @@
                 </div>
             </div>
 
+            @{
+                var qrCodeBase64 = ViewBag.QrCodeBase64 as string;
+            }
+            @if (!string.IsNullOrEmpty(qrCodeBase64))
+            {
+                <hr />
+                <div class="text-center mb-4">
+                    <h5 class="mb-3">Código QR del Carnet</h5>
+                    <img src="@qrCodeBase64" alt="Código QR del Carnet" style="max-width: 250px; border: 2px solid #dee2e6; border-radius: 8px; padding: 10px; background: white;">
+                    <p class="text-muted small mt-2">Escanea este código para compartir o verificar el carnet</p>
+                </div>
+            }
+
             @if (upcoming.Any())
             {
                 <hr />

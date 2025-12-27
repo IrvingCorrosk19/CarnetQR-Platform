@@ -19,6 +19,9 @@ builder.Services.AddControllersWithViews();
 // Add Infrastructure services
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Add QR Code Service
+builder.Services.AddScoped<CarnetQRPlatform.Web.Services.QrCodeService>();
+
 var app = builder.Build();
 
 // Initialize database

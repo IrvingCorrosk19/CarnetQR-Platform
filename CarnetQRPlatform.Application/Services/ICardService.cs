@@ -9,5 +9,6 @@ public interface ICardService
     Task<Card?> GetByQrTokenAsync(string qrToken);
     Task<Card> CreateAsync(Guid entityProfileId);
     Task<bool> DeleteAsync(Guid id);
+    Task<bool> ToggleActiveAsync(Guid id);
 }
 

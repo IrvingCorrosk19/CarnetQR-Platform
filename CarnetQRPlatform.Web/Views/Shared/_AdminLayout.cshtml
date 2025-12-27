@@ -123,17 +123,6 @@
                             </a>
                         </li>
 
-                        @* Plantillas: Solo InstitutionAdmin y SuperAdmin *@
-                        @if (User.IsInRole("SuperAdmin") || User.IsInRole("InstitutionAdmin"))
-                        {
-                            <li class="nav-item">
-                                <a href="@Url.Action("Index", "CardTemplates")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "CardTemplates" ? "active" : "")">
-                                    <i class="nav-icon fas fa-palette"></i>
-                                    <p>Plantillas de Carnets</p>
-                                </a>
-                            </li>
-                        }
-
                         @* Eventos: Todos los roles autenticados *@
                         <li class="nav-item">
                             <a href="@Url.Action("Index", "Events")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Events" ? "active" : "")">

@@ -214,24 +214,58 @@ public class EntityProfilesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> GenerateCard(Guid entityProfileId)
     {
+        System.Console.WriteLine("=== [EntityProfilesController] GenerateCard ===");
+        System.Console.WriteLine($"[Controller] EntityProfileId: {entityProfileId}");
+        
         try
         {
-            await _cardService.CreateAsync(entityProfileId);
+            System.Console.WriteLine("[Controller] Calling CardService.CreateAsync...");
+            var card = await _cardService.CreateAsync(entityProfileId);
+            System.Console.WriteLine($"[Controller] Card created successfully - Id: {card.Id}, CardNumber: {card.CardNumber}");
+            
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
-                return Json(new { success = true, message = "Carnet generado exitosamente." });
+                return Json(new { success = true, message = "Carnet generado exitosamente.", cardNumber = card.CardNumber });
             }
-            TempData["SuccessMessage"] = "Carnet generado exitosamente.";
+            TempData["SuccessMessage"] = $"Carnet generado exitosamente. Número: {card.CardNumber}";
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
-            _logger.LogError(ex, "Error generating card");
-            var errorMsg = "Error al generar el carnet.";
+            System.Console.WriteLine($"[Controller] ArgumentException: {ex.Message}");
+            _logger.LogError(ex, "Error generating card - ArgumentException");
+            var errorMsg = ex.Message;
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
                 return Json(new { success = false, message = errorMsg });
             }
             TempData["ErrorMessage"] = errorMsg;
+        }
+        catch (InvalidOperationException ex)
+        {
+            System.Console.WriteLine($"[Controller] InvalidOperationException: {ex.Message}");
+            _logger.LogError(ex, "Error generating card - InvalidOperationException");
+            var errorMsg = ex.Message;
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+            TempData["ErrorMessage"] = errorMsg;
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"[Controller] Exception: {ex.Message}");
+            System.Console.WriteLine($"[Controller] StackTrace: {ex.StackTrace}");
+            _logger.LogError(ex, "Error generating card");
+            var errorMsg = $"Error al generar el carnet: {ex.Message}";
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+            TempData["ErrorMessage"] = errorMsg;
+        }
+        finally
+        {
+            System.Console.WriteLine("=== [EntityProfilesController] GenerateCard END ===");
         }
 
         return RedirectToAction(nameof(Details), new { id = entityProfileId });
