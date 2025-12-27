@@ -1,6 +1,8 @@
+using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Web.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CarnetQRPlatform.Web.Controllers;
@@ -9,12 +11,21 @@ namespace CarnetQRPlatform.Web.Controllers;
 public class CardsController : Controller
 {
     private readonly ICardService _cardService;
+    private readonly IAuditService _auditService;
+    private readonly UserManager<Domain.Entities.AppUser> _userManager;
     private readonly ILogger<CardsController> _logger;
     private readonly QrCodeService _qrCodeService;
 
-    public CardsController(ICardService cardService, ILogger<CardsController> logger, QrCodeService qrCodeService)
+    public CardsController(
+        ICardService cardService,
+        IAuditService auditService,
+        UserManager<Domain.Entities.AppUser> userManager,
+        ILogger<CardsController> logger,
+        QrCodeService qrCodeService)
     {
         _cardService = cardService;
+        _auditService = auditService;
+        _userManager = userManager;
         _logger = logger;
         _qrCodeService = qrCodeService;
     }
@@ -63,6 +74,19 @@ public class CardsController : Controller
             }
 
             var card = await _cardService.GetByIdAsync(id);
+            if (card != null)
+            {
+                // Registrar auditoría
+                var userId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    card.InstitutionId,
+                    userId,
+                    "TOGGLE_ACTIVE",
+                    "Card",
+                    card.Id.ToString(),
+                    new Dictionary<string, object> { { "CardNumber", card.CardNumber }, { "IsActive", card.IsActive } });
+            }
+            
             var message = card?.IsActive == true ? "Carnet activado exitosamente." : "Carnet desactivado exitosamente.";
 
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")

@@ -1,9 +1,12 @@
+using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq;
+using System.IO;
 
 namespace CarnetQRPlatform.Web.Controllers;
 
@@ -13,17 +16,26 @@ public class EntityProfilesController : Controller
     private readonly IEntityProfileService _entityProfileService;
     private readonly ICardService _cardService;
     private readonly IInstitutionService _institutionService;
+    private readonly IAuditService _auditService;
+    private readonly ITenantProvider _tenantProvider;
+    private readonly UserManager<AppUser> _userManager;
     private readonly ILogger<EntityProfilesController> _logger;
 
     public EntityProfilesController(
         IEntityProfileService entityProfileService,
         ICardService cardService,
         IInstitutionService institutionService,
+        IAuditService auditService,
+        ITenantProvider tenantProvider,
+        UserManager<AppUser> userManager,
         ILogger<EntityProfilesController> logger)
     {
         _entityProfileService = entityProfileService;
         _cardService = cardService;
         _institutionService = institutionService;
+        _auditService = auditService;
+        _tenantProvider = tenantProvider;
+        _userManager = userManager;
         _logger = logger;
     }
 
@@ -56,6 +68,22 @@ public class EntityProfilesController : Controller
         {
             var institutions = await _institutionService.GetAllAsync();
             ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            // Para SuperAdmin, PhotoEnabled se determinará dinámicamente según la institución seleccionada
+            ViewBag.PhotoEnabled = false; // Se actualizará con JavaScript
+        }
+        else
+        {
+            // Obtener institución del tenant para verificar PhotoEnabled
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (tenantId.HasValue)
+            {
+                var institution = await _institutionService.GetByIdAsync(tenantId.Value);
+                ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
+            }
+            else
+            {
+                ViewBag.PhotoEnabled = false;
+            }
         }
         
         return View(model);
@@ -86,8 +114,8 @@ public class EntityProfilesController : Controller
                 }
                 
                 // Validar que la institución existe y está activa
-                var institution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
-                if (institution == null || !institution.IsActive)
+                var selectedInstitution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
+                if (selectedInstitution == null || !selectedInstitution.IsActive)
                 {
                     ModelState.AddModelError(nameof(entityProfile.InstitutionId), "La empresa seleccionada no existe o está inactiva.");
                     
@@ -108,6 +136,77 @@ public class EntityProfilesController : Controller
             }
             
             ModelState.Remove(nameof(entityProfile.Institution)); // Remover también la propiedad de navegación
+            ModelState.Remove(nameof(entityProfile.PhotoPath)); // PhotoPath se maneja por separado
+            
+            // Obtener institución para verificar PhotoEnabled
+            Institution? institution = null;
+            if (User.IsInRole(Roles.SuperAdmin))
+            {
+                institution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
+            }
+            else
+            {
+                var tenantId = _tenantProvider.GetCurrentTenantId();
+                if (tenantId.HasValue)
+                {
+                    institution = await _institutionService.GetByIdAsync(tenantId.Value);
+                }
+            }
+            
+            // Manejar upload de foto si PhotoEnabled está activo
+            if (institution != null && institution.PhotoEnabled)
+            {
+                var photoFile = Request.Form.Files["PhotoFile"];
+                if (photoFile != null && photoFile.Length > 0)
+                {
+                    // Validar tipo de archivo
+                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                    var extension = Path.GetExtension(photoFile.FileName).ToLowerInvariant();
+                    if (!allowedExtensions.Contains(extension))
+                    {
+                        ModelState.AddModelError("PhotoFile", "Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).");
+                    }
+                    else
+                    {
+                        // Validar tamaño (máximo 5MB)
+                        if (photoFile.Length > 5 * 1024 * 1024)
+                        {
+                            ModelState.AddModelError("PhotoFile", "El archivo no puede exceder 5MB.");
+                        }
+                        else
+                        {
+                            // Validar magic bytes para seguridad adicional
+                            var isValidImage = await ValidateImageFile(photoFile);
+                            if (!isValidImage)
+                            {
+                                ModelState.AddModelError("PhotoFile", "El archivo no es una imagen válida.");
+                            }
+                            else
+                            {
+                                // Crear directorio si no existe
+                                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "photos");
+                                if (!Directory.Exists(uploadsDir))
+                                {
+                                    Directory.CreateDirectory(uploadsDir);
+                                }
+
+                                // Generar nombre único
+                                var fileName = $"{Guid.NewGuid()}{extension}";
+                                var filePath = Path.Combine(uploadsDir, fileName);
+                                var relativePath = $"/uploads/photos/{fileName}";
+
+                                // Guardar archivo
+                                using (var stream = new FileStream(filePath, FileMode.Create))
+                                {
+                                    await photoFile.CopyToAsync(stream);
+                                }
+
+                                entityProfile.PhotoPath = relativePath;
+                            }
+                        }
+                    }
+                }
+            }
             
             if (!ModelState.IsValid)
             {
@@ -122,6 +221,17 @@ public class EntityProfilesController : Controller
             }
 
             var created = await _entityProfileService.CreateAsync(entityProfile);
+            
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            var institutionId = created.InstitutionId;
+            await _auditService.LogActionAsync(
+                institutionId,
+                userId,
+                "CREATE",
+                "EntityProfile",
+                created.Id.ToString(),
+                new Dictionary<string, object> { { "Name", $"{created.FirstName} {created.LastName}" } });
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -154,6 +264,10 @@ public class EntityProfilesController : Controller
             return NotFound();
         }
 
+        // Obtener institución para verificar PhotoEnabled
+        var institution = await _institutionService.GetByIdAsync(entity.InstitutionId);
+        ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
+
         return View(entity);
     }
 
@@ -172,6 +286,75 @@ public class EntityProfilesController : Controller
 
         // InstitutionId ya está establecido desde el modelo cargado, no necesita validación
         ModelState.Remove(nameof(entityProfile.InstitutionId));
+        ModelState.Remove(nameof(entityProfile.PhotoPath)); // PhotoPath se maneja por separado
+        
+        // Obtener institución para verificar PhotoEnabled
+        var institution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
+        
+        // Manejar upload de foto si PhotoEnabled está activo
+        if (institution != null && institution.PhotoEnabled)
+        {
+            var photoFile = Request.Form.Files["PhotoFile"];
+            if (photoFile != null && photoFile.Length > 0)
+            {
+                // Validar tipo de archivo
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                var extension = Path.GetExtension(photoFile.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(extension))
+                {
+                    ModelState.AddModelError("PhotoFile", "Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).");
+                }
+                else
+                {
+                    // Validar tamaño (máximo 5MB)
+                    if (photoFile.Length > 5 * 1024 * 1024)
+                    {
+                        ModelState.AddModelError("PhotoFile", "El archivo no puede exceder 5MB.");
+                    }
+                    else
+                    {
+                        // Validar magic bytes para seguridad adicional
+                        var isValidImage = await ValidateImageFile(photoFile);
+                        if (!isValidImage)
+                        {
+                            ModelState.AddModelError("PhotoFile", "El archivo no es una imagen válida.");
+                        }
+                        else
+                        {
+                            // Crear directorio si no existe
+                            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "photos");
+                            if (!Directory.Exists(uploadsDir))
+                            {
+                                Directory.CreateDirectory(uploadsDir);
+                            }
+
+                            // Generar nombre único
+                            var fileName = $"{Guid.NewGuid()}{extension}";
+                            var filePath = Path.Combine(uploadsDir, fileName);
+                            var relativePath = $"/uploads/photos/{fileName}";
+
+                            // Guardar archivo
+                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            {
+                                await photoFile.CopyToAsync(stream);
+                            }
+
+                            // Eliminar foto anterior si existe
+                            if (!string.IsNullOrEmpty(entityProfile.PhotoPath) && entityProfile.PhotoPath.StartsWith("/uploads/photos/"))
+                            {
+                                var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", entityProfile.PhotoPath.TrimStart('/'));
+                                if (System.IO.File.Exists(oldFilePath))
+                                {
+                                    System.IO.File.Delete(oldFilePath);
+                                }
+                            }
+
+                            entityProfile.PhotoPath = relativePath;
+                        }
+                    }
+                }
+            }
+        }
 
         if (!ModelState.IsValid)
         {
@@ -185,7 +368,17 @@ public class EntityProfilesController : Controller
 
         try
         {
-            await _entityProfileService.UpdateAsync(entityProfile);
+            var updated = await _entityProfileService.UpdateAsync(entityProfile);
+            
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            await _auditService.LogActionAsync(
+                updated.InstitutionId,
+                userId,
+                "UPDATE",
+                "EntityProfile",
+                updated.Id.ToString(),
+                new Dictionary<string, object> { { "Name", $"{updated.FirstName} {updated.LastName}" } });
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -222,6 +415,16 @@ public class EntityProfilesController : Controller
             System.Console.WriteLine("[Controller] Calling CardService.CreateAsync...");
             var card = await _cardService.CreateAsync(entityProfileId);
             System.Console.WriteLine($"[Controller] Card created successfully - Id: {card.Id}, CardNumber: {card.CardNumber}");
+            
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            await _auditService.LogActionAsync(
+                card.InstitutionId,
+                userId,
+                "CREATE",
+                "Card",
+                card.Id.ToString(),
+                new Dictionary<string, object> { { "CardNumber", card.CardNumber }, { "EntityProfileId", entityProfileId.ToString() } });
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -295,9 +498,25 @@ public class EntityProfilesController : Controller
             System.Console.WriteLine($"[Controller] Entity found: {entity.FirstName} {entity.LastName}, InstitutionId: {entity.InstitutionId}");
             System.Console.WriteLine("[Controller] Calling DeleteAsync...");
             
+            var institutionId = entity.InstitutionId;
+            var entityName = $"{entity.FirstName} {entity.LastName}";
+            
             var deleted = await _entityProfileService.DeleteAsync(id);
             
             System.Console.WriteLine($"[Controller] DeleteAsync returned: {deleted}");
+            
+            if (deleted)
+            {
+                // Registrar auditoría
+                var userId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    institutionId,
+                    userId,
+                    "DELETE",
+                    "EntityProfile",
+                    id.ToString(),
+                    new Dictionary<string, object> { { "Name", entityName } });
+            }
             
             if (!deleted)
             {
@@ -353,6 +572,34 @@ public class EntityProfilesController : Controller
         finally
         {
             System.Console.WriteLine("=== [EntityProfilesController] Delete END ===");
+        }
+    }
+
+    private async Task<bool> ValidateImageFile(IFormFile file)
+    {
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var buffer = new byte[4];
+            await stream.ReadAsync(buffer, 0, 4);
+            stream.Position = 0;
+
+            // Verificar magic bytes de imágenes comunes
+            // JPEG: FF D8 FF
+            // PNG: 89 50 4E 47
+            // GIF: 47 49 46 38
+            if (buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF) // JPEG
+                return true;
+            if (buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47) // PNG
+                return true;
+            if (buffer[0] == 0x47 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x38) // GIF
+                return true;
+
+            return false;
+        }
+        catch
+        {
+            return false;
         }
     }
 }

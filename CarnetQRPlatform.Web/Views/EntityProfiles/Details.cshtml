@@ -12,13 +12,24 @@
         </h3>
     </div>
     <div class="card-body">
-        <dl class="row">
-            <dt class="col-sm-3">Identificación:</dt><dd class="col-sm-9">@(Model.IdentificationNumber ?? "-")</dd>
-            <dt class="col-sm-3">Nombre:</dt><dd class="col-sm-9">@($"{Model.FirstName} {Model.LastName}")</dd>
-            <dt class="col-sm-3">Email:</dt><dd class="col-sm-9">@(Model.Email ?? "-")</dd>
-            <dt class="col-sm-3">Teléfono:</dt><dd class="col-sm-9">@(Model.Phone ?? "-")</dd>
-            <dt class="col-sm-3">Estado:</dt><dd class="col-sm-9"><span class="badge bg-@(Model.IsActive ? "success" : "secondary")">@(Model.IsActive ? "Activo" : "Inactivo")</span></dd>
-        </dl>
+        <div class="row">
+            <div class="col-md-8">
+                <dl class="row">
+                    <dt class="col-sm-3">Identificación:</dt><dd class="col-sm-9">@(Model.IdentificationNumber ?? "-")</dd>
+                    <dt class="col-sm-3">Nombre:</dt><dd class="col-sm-9">@($"{Model.FirstName} {Model.LastName}")</dd>
+                    <dt class="col-sm-3">Email:</dt><dd class="col-sm-9">@(Model.Email ?? "-")</dd>
+                    <dt class="col-sm-3">Teléfono:</dt><dd class="col-sm-9">@(Model.Phone ?? "-")</dd>
+                    <dt class="col-sm-3">Estado:</dt><dd class="col-sm-9"><span class="badge bg-@(Model.IsActive ? "success" : "secondary")">@(Model.IsActive ? "Activo" : "Inactivo")</span></dd>
+                </dl>
+            </div>
+            @if (!string.IsNullOrEmpty(Model.PhotoPath))
+            {
+                <div class="col-md-4 text-center">
+                    <img src="@Model.PhotoPath" alt="Foto del paciente" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                    <p class="text-muted small mt-2">Foto del Paciente</p>
+                </div>
+            }
+        </div>
         <div class="mt-3">
             <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Editar</a>
             <a asp-action="Index" class="btn btn-secondary">Volver</a>

@@ -61,6 +61,7 @@ public class CarnetController : Controller
             Email = card.EntityProfile?.Email,
             Phone = card.EntityProfile?.Phone,
             DateOfBirth = card.EntityProfile?.DateOfBirth,
+            PhotoPath = card.EntityProfile?.PhotoPath,
             
             InstitutionName = card.Institution?.Name ?? string.Empty,
             InstitutionLogoPath = card.Institution?.LogoPath,
@@ -80,6 +81,7 @@ public class CarnetController : Controller
                 ShowUserName = true,
                 ShowCardNumber = true,
                 ShowQrCode = true,
+                ShowPhoto = card.Institution?.PhotoEnabled == true && !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath),
                 ShowIdentificationNumber = false,
                 ShowEmail = false,
                 ShowPhone = false
@@ -150,6 +152,12 @@ public class CarnetController : Controller
         {
             if (bool.TryParse(Request.Query["showPhone"], out var showPhone))
                 viewModel.Config.ShowPhone = showPhone;
+        }
+        
+        if (Request.Query.ContainsKey("showPhoto"))
+        {
+            if (bool.TryParse(Request.Query["showPhoto"], out var showPhoto))
+                viewModel.Config.ShowPhoto = showPhoto;
         }
 
         return View("PrintCarnet", viewModel);

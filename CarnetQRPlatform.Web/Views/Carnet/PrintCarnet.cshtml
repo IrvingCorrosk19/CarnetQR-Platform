@@ -124,6 +124,22 @@
             margin-bottom: 1mm;
         }
 
+        .carnet-photo {
+            flex-shrink: 0;
+            text-align: center;
+            margin-right: 3mm;
+        }
+
+        .carnet-photo img {
+            width: 25mm;
+            height: 30mm;
+            object-fit: cover;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            background: white;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.15);
+        }
+
         .carnet-qr {
             flex-shrink: 0;
             text-align: center;
@@ -263,6 +279,13 @@
 
         <!-- Body -->
         <div class="carnet-body">
+            @if (config.ShowPhoto && !string.IsNullOrEmpty(Model.PhotoPath))
+            {
+                <div class="carnet-photo">
+                    <img src="@Model.PhotoPath" alt="Foto">
+                </div>
+            }
+            
             <div class="carnet-info">
                 @if (config.ShowUserName)
                 {

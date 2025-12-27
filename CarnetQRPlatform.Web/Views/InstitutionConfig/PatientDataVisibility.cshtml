@@ -1,0 +1,111 @@
+@model CarnetQRPlatform.Domain.Entities.Institution
+@{
+    ViewData["Title"] = "Configuración de Visibilidad de Datos del Paciente";
+    var availableFields = ViewBag.AvailableFields as List<SelectListItem> ?? new List<SelectListItem>();
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-eye me-2"></i>
+            Configuración de Visibilidad de Datos del Paciente
+        </h3>
+        <div class="card-tools">
+            <a href="@Url.Action("Index", "InstitutionConfig")" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+    <form asp-action="PatientDataVisibility" method="post" id="patientDataVisibilityForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>Configuración Global</h6>
+                <p class="mb-0">
+                    Esta configuración se aplica a todos los pacientes de la institución. 
+                    Los administradores pueden sobrescribir esta configuración para pacientes específicos desde la edición de cada entidad.
+                </p>
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="form-label"><strong>Seleccione qué datos del paciente se mostrarán en el QR público:</strong></label>
+                
+                <div class="row">
+                    @foreach (var field in availableFields)
+                    {
+                        var isVisible = Model.PatientDataVisibilityConfig != null && 
+                                       Model.PatientDataVisibilityConfig.ContainsKey(field.Value) && 
+                                       Model.PatientDataVisibilityConfig[field.Value];
+                        
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" 
+                                       id="field_@field.Value" 
+                                       name="patientDataVisibilityConfig[@field.Value]" 
+                                       value="true"
+                                       @(isVisible ? "checked" : "")>
+                                <label class="form-check-label" for="field_@field.Value">
+                                    <strong>@field.Text</strong>
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <small class="form-text text-muted">
+                    Los campos marcados se mostrarán cuando alguien escanee el código QR del carnet.
+                    Los campos no marcados permanecerán ocultos para proteger la privacidad del paciente.
+                </small>
+            </div>
+
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Información</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Esta es una configuración <strong>global</strong> que se aplica a todos los pacientes.</li>
+                        <li>Puede configurar la visibilidad <strong>por paciente</strong> desde la edición de cada entidad.</li>
+                        <li>La configuración por paciente <strong>sobrescribe</strong> esta configuración global.</li>
+                        <li>El <strong>número de carnet</strong> siempre se muestra (no configurable).</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Configuración
+            </button>
+            <a href="@Url.Action("Index", "InstitutionConfig")" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Submit form
+            $('#patientDataVisibilityForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Guardando configuración...',
+                    successMessage: 'Configuración guardada exitosamente',
+                    redirectUrl: '@Url.Action("PatientDataVisibility", "InstitutionConfig")'
+                });
+            });
+        });
+    </script>
+}
+

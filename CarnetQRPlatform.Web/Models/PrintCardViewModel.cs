@@ -14,6 +14,7 @@ public class PrintCardViewModel
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public DateTime? DateOfBirth { get; set; }
+    public string? PhotoPath { get; set; }
     
     // Datos de la Institución
     public string InstitutionName { get; set; } = string.Empty;
@@ -39,6 +40,7 @@ public class PrintCardConfig
     public bool ShowUserName { get; set; } = true;
     public bool ShowCardNumber { get; set; } = true;
     public bool ShowQrCode { get; set; } = true;
+    public bool ShowPhoto { get; set; } = false;
     public bool ShowIdentificationNumber { get; set; } = false;
     public bool ShowEmail { get; set; } = false;
     public bool ShowPhone { get; set; } = false;

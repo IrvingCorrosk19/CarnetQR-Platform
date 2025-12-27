@@ -90,7 +90,7 @@
                             </a>
                         </li>
                         
-                        @* Solo SuperAdmin puede gestionar empresas y usuarios *@
+                        @* Solo SuperAdmin puede gestionar empresas *@
                         @if (User.IsInRole("SuperAdmin"))
                         {
                             <li class="nav-item">
@@ -99,6 +99,11 @@
                                     <p>Empresas</p>
                                 </a>
                             </li>
+                        }
+                        
+                        @* SuperAdmin e InstitutionAdmin pueden gestionar usuarios *@
+                        @if (User.IsInRole("SuperAdmin") || User.IsInRole("InstitutionAdmin"))
+                        {
                             <li class="nav-item">
                                 <a href="@Url.Action("Index", "Users")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Users" ? "active" : "")">
                                     <i class="nav-icon fas fa-user-shield"></i>
@@ -138,6 +143,17 @@
                                 <a href="@Url.Action("Index", "Statistics")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Statistics" ? "active" : "")">
                                     <i class="nav-icon fas fa-chart-bar"></i>
                                     <p>Estadísticas</p>
+                                </a>
+                            </li>
+                        }
+
+                        @* Configuración: Solo InstitutionAdmin y SuperAdmin *@
+                        @if (User.IsInRole("SuperAdmin") || User.IsInRole("InstitutionAdmin"))
+                        {
+                            <li class="nav-item">
+                                <a href="@Url.Action("Index", "InstitutionConfig")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "InstitutionConfig" ? "active" : "")">
+                                    <i class="nav-icon fas fa-cog"></i>
+                                    <p>Configuración</p>
                                 </a>
                             </li>
                         }

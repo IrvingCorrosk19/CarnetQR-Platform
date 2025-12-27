@@ -1,8 +1,12 @@
+using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
+using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq;
+using System.Security.Claims;
 
 namespace CarnetQRPlatform.Web.Controllers;
 
@@ -10,11 +14,19 @@ namespace CarnetQRPlatform.Web.Controllers;
 public class InstitutionsController : Controller
 {
     private readonly IInstitutionService _institutionService;
+    private readonly UserManager<AppUser> _userManager;
+    private readonly IAuditService _auditService;
     private readonly ILogger<InstitutionsController> _logger;
 
-    public InstitutionsController(IInstitutionService institutionService, ILogger<InstitutionsController> logger)
+    public InstitutionsController(
+        IInstitutionService institutionService,
+        UserManager<AppUser> userManager,
+        IAuditService auditService,
+        ILogger<InstitutionsController> logger)
     {
         _institutionService = institutionService;
+        _userManager = userManager;
+        _auditService = auditService;
         _logger = logger;
     }
 
@@ -26,12 +38,12 @@ public class InstitutionsController : Controller
 
     public IActionResult Create()
     {
-        return View(new Institution());
+        return View(new Models.CreateInstitutionViewModel());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Institution institution)
+    public async Task<IActionResult> Create(Models.CreateInstitutionViewModel model)
     {
         if (!ModelState.IsValid)
         {
@@ -40,19 +52,73 @@ public class InstitutionsController : Controller
                 var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
                 return Json(new { success = false, message = string.Join(" ", errors) });
             }
-            return View(institution);
+            return View(model);
         }
 
         try
         {
-            await _institutionService.CreateAsync(institution);
+            // Crear la institución
+            var institution = new Institution
+            {
+                Name = model.Name,
+                Description = model.Description,
+                Email = model.Email,
+                Phone = model.Phone,
+                Address = model.Address,
+                CardPrefix = model.CardPrefix,
+                InstitutionType = model.InstitutionType,
+                IsActive = true
+            };
+
+            var createdInstitution = await _institutionService.CreateAsync(institution);
+
+            // Crear el usuario Administrador de la institución
+            var adminUser = new AppUser
+            {
+                UserName = model.AdminEmail,
+                Email = model.AdminEmail,
+                FirstName = model.AdminFirstName,
+                LastName = model.AdminLastName,
+                InstitutionId = createdInstitution.Id,
+                IsActive = true,
+                EmailConfirmed = true
+            };
+
+            var createUserResult = await _userManager.CreateAsync(adminUser, model.AdminPassword);
+            
+            if (createUserResult.Succeeded)
+            {
+                await _userManager.AddToRoleAsync(adminUser, Roles.InstitutionAdmin);
+                
+                // Agregar claim de InstitutionId
+                await _userManager.AddClaimAsync(adminUser, new Claim("InstitutionId", createdInstitution.Id.ToString()));
+                
+                _logger.LogInformation("InstitutionAdmin created for institution {InstitutionName}: {Email}", 
+                    createdInstitution.Name, model.AdminEmail);
+            }
+            else
+            {
+                _logger.LogError("Error creating InstitutionAdmin: {Errors}", 
+                    string.Join(", ", createUserResult.Errors.Select(e => e.Description)));
+                // Continuar aunque falle la creación del admin (se puede crear manualmente después)
+            }
+
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            await _auditService.LogActionAsync(
+                createdInstitution.Id,
+                userId,
+                "CREATE",
+                "Institution",
+                createdInstitution.Id.ToString(),
+                new Dictionary<string, object> { { "Name", createdInstitution.Name } });
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
-                return Json(new { success = true, message = "Empresa creada exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+                return Json(new { success = true, message = "Empresa y administrador creados exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
             }
             
-            TempData["SuccessMessage"] = "Empresa creada exitosamente.";
+            TempData["SuccessMessage"] = "Empresa y administrador creados exitosamente.";
             return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
@@ -66,7 +132,7 @@ public class InstitutionsController : Controller
             }
             
             ModelState.AddModelError("", errorMsg);
-            return View(institution);
+            return View(model);
         }
     }
 
@@ -83,7 +149,7 @@ public class InstitutionsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Institution institution)
+    public async Task<IActionResult> Edit(Guid id, Institution institution, IFormFile? logoFile)
     {
         if (id != institution.Id)
         {
@@ -106,7 +172,67 @@ public class InstitutionsController : Controller
 
         try
         {
+            // Manejar upload de logo
+            if (logoFile != null && logoFile.Length > 0)
+            {
+                // Validar tipo de archivo
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".svg" };
+                var extension = Path.GetExtension(logoFile.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(extension))
+                {
+                    ModelState.AddModelError("", "Solo se permiten archivos de imagen (JPG, PNG, GIF, SVG).");
+                    return View(institution);
+                }
+
+                // Validar tamaño (máximo 5MB)
+                if (logoFile.Length > 5 * 1024 * 1024)
+                {
+                    ModelState.AddModelError("", "El archivo no puede ser mayor a 5MB.");
+                    return View(institution);
+                }
+
+                // Crear directorio si no existe
+                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "logos");
+                if (!Directory.Exists(uploadsDir))
+                {
+                    Directory.CreateDirectory(uploadsDir);
+                }
+
+                // Generar nombre único
+                var fileName = $"{institution.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}{extension}";
+                var filePath = Path.Combine(uploadsDir, fileName);
+                var relativePath = $"/uploads/logos/{fileName}";
+
+                // Guardar archivo
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await logoFile.CopyToAsync(stream);
+                }
+
+                // Eliminar logo anterior si existe
+                if (!string.IsNullOrEmpty(institution.LogoPath) && institution.LogoPath.StartsWith("/uploads/logos/"))
+                {
+                    var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", institution.LogoPath.TrimStart('/'));
+                    if (System.IO.File.Exists(oldFilePath))
+                    {
+                        System.IO.File.Delete(oldFilePath);
+                    }
+                }
+
+                institution.LogoPath = relativePath;
+            }
+
             await _institutionService.UpdateAsync(institution);
+            
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            await _auditService.LogActionAsync(
+                institution.Id,
+                userId,
+                "UPDATE",
+                "Institution",
+                institution.Id.ToString(),
+                new Dictionary<string, object> { { "Name", institution.Name } });
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -159,6 +285,17 @@ public class InstitutionsController : Controller
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetInstitutionPhotoEnabled(Guid id)
+    {
+        var institution = await _institutionService.GetByIdAsync(id);
+        if (institution == null)
+        {
+            return Json(new { photoEnabled = false });
+        }
+        return Json(new { photoEnabled = institution.PhotoEnabled });
     }
 }
 

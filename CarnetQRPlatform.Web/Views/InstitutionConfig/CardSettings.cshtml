@@ -1,0 +1,213 @@
+@model CarnetQRPlatform.Domain.Entities.Institution
+@{
+    ViewData["Title"] = "Configuración del Carnet";
+    var availableFields = ViewBag.AvailableFields as List<SelectListItem> ?? new List<SelectListItem>();
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-id-card me-2"></i>
+            Configuración del Carnet
+        </h3>
+        <div class="card-tools">
+            <a href="@Url.Action("Index", "InstitutionConfig")" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+    <form asp-action="CardSettings" method="post" id="cardSettingsForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            <!-- Foto del Paciente -->
+            <div class="form-group mb-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="photoEnabled" name="photoEnabled" @(Model.PhotoEnabled ? "checked" : "")>
+                    <label class="form-check-label" for="photoEnabled">
+                        <strong>Habilitar Foto en el Carnet</strong>
+                    </label>
+                </div>
+                <small class="form-text text-muted">
+                    Si está habilitado, los usuarios internos podrán cargar la foto del paciente al crear o editar entidades.
+                </small>
+            </div>
+
+            <hr />
+
+            <!-- Modo de Visualización del QR Público -->
+            <div class="form-group mb-4">
+                <label class="form-label"><strong>Modo de Visualización en QR Público</strong></label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="qrPublicDisplayMode" id="qrModeCardNumber" value="0" @(Model.QrPublicDisplayMode == CarnetQRPlatform.Domain.Entities.QrPublicDisplayMode.CardNumber ? "checked" : "")>
+                    <label class="form-check-label" for="qrModeCardNumber">
+                        Mostrar Número de Carnet
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="qrPublicDisplayMode" id="qrModePatientName" value="1" @(Model.QrPublicDisplayMode == CarnetQRPlatform.Domain.Entities.QrPublicDisplayMode.PatientName ? "checked" : "")>
+                    <label class="form-check-label" for="qrModePatientName">
+                        Mostrar Nombre del Paciente
+                    </label>
+                </div>
+                <small class="form-text text-muted">
+                    Seleccione qué información se mostrará como identificación principal cuando se escanee el QR.
+                </small>
+            </div>
+
+            <hr />
+
+            <!-- Campos Visibles del Carnet -->
+            <div class="form-group mb-4">
+                <label class="form-label"><strong>Campos Visibles en el Carnet (Máximo 6)</strong></label>
+                <div id="visibleFieldsContainer">
+                    @if (Model.VisibleFields != null && Model.VisibleFields.Any())
+                    {
+                        @for (int i = 0; i < Model.VisibleFields.Count && i < 6; i++)
+                        {
+                            var currentField = Model.VisibleFields[i];
+                            <div class="input-group mb-2 visible-field-row">
+                                <select class="form-select" name="visibleFields" required>
+                                    <option value="">-- Seleccione un campo --</option>
+                                    @foreach (var field in availableFields)
+                                    {
+                                        var isSelected = field.Value == currentField;
+                                        <option value="@field.Value" selected="@isSelected">@field.Text</option>
+                                    }
+                                </select>
+                                @{
+                                    var isDisabled = Model.VisibleFields.Count <= 1;
+                                }
+                                <button type="button" class="btn btn-danger remove-field-btn" disabled="@isDisabled">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="input-group mb-2 visible-field-row">
+                            <select class="form-select" name="visibleFields" required>
+                                <option value="">-- Seleccione un campo --</option>
+                                @foreach (var field in availableFields)
+                                {
+                                    <option value="@field.Value">@field.Text</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-danger remove-field-btn" disabled>
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    }
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addFieldBtn" @(Model.VisibleFields != null && Model.VisibleFields.Count >= 6 ? "disabled" : "")>
+                    <i class="fas fa-plus"></i> Agregar Campo
+                </button>
+                <small class="form-text text-muted d-block mt-2">
+                    Seleccione hasta 6 campos que se mostrarán en el carnet físico. El orden importa.
+                </small>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Configuración
+            </button>
+            <a href="@Url.Action("Index", "InstitutionConfig")" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            var maxFields = 6;
+            var availableFields = @Html.Raw(Json.Serialize(availableFields));
+
+            // Agregar campo
+            $('#addFieldBtn').on('click', function() {
+                var currentCount = $('.visible-field-row').length;
+                if (currentCount >= maxFields) {
+                    Swal.fire('Advertencia', 'Máximo 6 campos permitidos.', 'warning');
+                    return;
+                }
+
+                var html = `
+                    <div class="input-group mb-2 visible-field-row">
+                        <select class="form-select" name="visibleFields" required>
+                            <option value="">-- Seleccione un campo --</option>
+                            ${availableFields.map(f => `<option value="${f.value}">${f.text}</option>`).join('')}
+                        </select>
+                        <button type="button" class="btn btn-danger remove-field-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                $('#visibleFieldsContainer').append(html);
+                updateAddButtonState();
+            });
+
+            // Eliminar campo
+            $(document).on('click', '.remove-field-btn', function() {
+                if ($('.visible-field-row').length <= 1) {
+                    Swal.fire('Advertencia', 'Debe tener al menos un campo.', 'warning');
+                    return;
+                }
+                $(this).closest('.visible-field-row').remove();
+                updateAddButtonState();
+            });
+
+            function updateAddButtonState() {
+                var currentCount = $('.visible-field-row').length;
+                $('#addFieldBtn').prop('disabled', currentCount >= maxFields);
+                $('.remove-field-btn').prop('disabled', currentCount <= 1);
+            }
+
+            // Submit form
+            $('#cardSettingsForm').on('submit', function(e) {
+                e.preventDefault();
+                var form = this;
+                var formData = new FormData(form);
+                
+                // Convertir visibleFields a array
+                var visibleFields = [];
+                $('select[name="visibleFields"]').each(function() {
+                    var value = $(this).val();
+                    if (value) {
+                        visibleFields.push(value);
+                    }
+                });
+
+                // Validar máximo 6 campos
+                if (visibleFields.length > maxFields) {
+                    Swal.fire('Error', 'Máximo 6 campos permitidos.', 'error');
+                    return;
+                }
+
+                // Agregar visibleFields al FormData
+                formData.delete('visibleFields');
+                visibleFields.forEach(function(field) {
+                    formData.append('visibleFields', field);
+                });
+
+                submitFormAjax(form, {
+                    loadingMessage: 'Guardando configuración...',
+                    successMessage: 'Configuración guardada exitosamente',
+                    redirectUrl: '@Url.Action("CardSettings", "InstitutionConfig")',
+                    formData: formData
+                });
+            });
+        });
+    </script>
+}
+

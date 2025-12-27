@@ -1,4 +1,5 @@
 using CarnetQRPlatform.Domain.Entities;
+using CarnetQRPlatform.Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -127,6 +128,35 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
             entity.Property(e => e.CardPrefix).IsRequired().HasMaxLength(10);
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.CardPrefix).IsUnique();
+            
+            // Configurar enum InstitutionType
+            entity.Property(e => e.InstitutionType)
+                .HasConversion<int>();
+            
+            // Configurar enum QrPublicDisplayMode
+            entity.Property(e => e.QrPublicDisplayMode)
+                .HasConversion<int>();
+            
+            // Configurar campos JSON
+            var jsonOptions = new JsonSerializerOptions();
+            
+            entity.Property(e => e.VisibleFields)
+                .HasConversion(
+                    v => v == null || v.Count == 0 ? "[]" : JsonSerializer.Serialize(v, jsonOptions),
+                    v => string.IsNullOrWhiteSpace(v) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
+                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => new List<string>(c)));
+            
+            entity.Property(e => e.PatientDataVisibilityConfig)
+                .HasConversion(
+                    v => v == null || v.Count == 0 ? "{}" : JsonSerializer.Serialize(v, jsonOptions),
+                    v => string.IsNullOrWhiteSpace(v) ? new Dictionary<string, bool>() : JsonSerializer.Deserialize<Dictionary<string, bool>>(v, jsonOptions) ?? new())
+                .Metadata.SetValueComparer(new ValueComparer<Dictionary<string, bool>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => new Dictionary<string, bool>(c)));
         });
     }
 
@@ -146,12 +176,22 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
             var jsonOptions = new JsonSerializerOptions();
             entity.Property(e => e.CustomFields)
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, jsonOptions),
-                    v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, jsonOptions) ?? new())
+                    v => v == null || v.Count == 0 ? "{}" : JsonSerializer.Serialize(v, jsonOptions),
+                    v => string.IsNullOrWhiteSpace(v) ? new Dictionary<string, object>() : JsonSerializer.Deserialize<Dictionary<string, object>>(v, jsonOptions) ?? new())
                 .Metadata.SetValueComparer(new ValueComparer<Dictionary<string, object>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => new Dictionary<string, object>(c)));
+            
+            // Configurar PatientDataVisibilityOverride
+            entity.Property(e => e.PatientDataVisibilityOverride)
+                .HasConversion(
+                    v => v != null && v.Count > 0 ? JsonSerializer.Serialize(v, jsonOptions) : null,
+                    v => !string.IsNullOrWhiteSpace(v) ? JsonSerializer.Deserialize<Dictionary<string, bool>>(v, jsonOptions) : null)
+                .Metadata.SetValueComparer(new ValueComparer<Dictionary<string, bool>?>(
+                    (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
+                    c => c != null ? c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())) : 0,
+                    c => c != null ? new Dictionary<string, bool>(c) : null));
         });
     }
 
@@ -195,8 +235,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
             var jsonOptions = new JsonSerializerOptions();
             entity.Property(e => e.TemplateConfig)
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, jsonOptions),
-                    v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, jsonOptions) ?? new())
+                    v => v == null || v.Count == 0 ? "{}" : JsonSerializer.Serialize(v, jsonOptions),
+                    v => string.IsNullOrWhiteSpace(v) ? new Dictionary<string, object>() : JsonSerializer.Deserialize<Dictionary<string, object>>(v, jsonOptions) ?? new())
                 .Metadata.SetValueComparer(new ValueComparer<Dictionary<string, object>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
@@ -240,8 +280,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
             var jsonOptions = new JsonSerializerOptions();
             entity.Property(e => e.Metadata)
                 .HasConversion(
-                    v => v != null ? JsonSerializer.Serialize(v, jsonOptions) : null,
-                    v => v != null ? JsonSerializer.Deserialize<Dictionary<string, object>>(v, jsonOptions) : null)
+                    v => v != null && v.Count > 0 ? JsonSerializer.Serialize(v, jsonOptions) : null,
+                    v => !string.IsNullOrWhiteSpace(v) ? JsonSerializer.Deserialize<Dictionary<string, object>>(v, jsonOptions) : null)
                 .Metadata.SetValueComparer(new ValueComparer<Dictionary<string, object>?>(
                     (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
                     c => c != null ? c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())) : 0,

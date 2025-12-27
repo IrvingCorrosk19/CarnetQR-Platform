@@ -1,13 +1,13 @@
 @model CarnetQRPlatform.Domain.Entities.Institution
 @{
-    ViewData["Title"] = "Editar Empresa";
+    ViewData["Title"] = "Editar Datos de la Institución";
 }
 
 <div class="card fade-in">
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-edit me-2"></i>
-            Editar Empresa
+            Editar Datos de la Institución
         </h3>
     </div>
     <form asp-action="Edit" method="post" id="editInstitutionForm" enctype="multipart/form-data">
@@ -32,60 +32,41 @@
             }
 
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-12">
                     <div class="form-group mb-4">
-                        <label asp-for="Name" class="form-label">Nombre de la Empresa</label>
-                        <input asp-for="Name" class="form-control" placeholder="Ingrese el nombre de la empresa" required />
+                        <label asp-for="Name" class="form-label">Nombre de la Institución <span class="text-danger">*</span></label>
+                        <input asp-for="Name" class="form-control" placeholder="Ingrese el nombre de la institución" required />
                         <span asp-validation-for="Name" class="text-danger"></span>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="form-group mb-4">
-                        <label asp-for="CardPrefix" class="form-label">Prefijo de Carnet</label>
-                        <input asp-for="CardPrefix" class="form-control" maxlength="10" readonly />
-                        <span asp-validation-for="CardPrefix" class="text-danger"></span>
-                        <small class="form-text text-muted">El prefijo no puede modificarse después de crear la empresa.</small>
                     </div>
                 </div>
             </div>
 
             <div class="form-group mb-4">
                 <label asp-for="Description" class="form-label">Descripción</label>
-                <textarea asp-for="Description" class="form-control" rows="3" placeholder="Descripción de la empresa"></textarea>
+                <textarea asp-for="Description" class="form-control" rows="3" placeholder="Descripción de la institución"></textarea>
                 <span asp-validation-for="Description" class="text-danger"></span>
             </div>
 
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="form-group mb-4">
                         <label asp-for="Email" class="form-label">Correo Electrónico</label>
-                        <input asp-for="Email" type="email" class="form-control" placeholder="correo@empresa.com" />
+                        <input asp-for="Email" type="email" class="form-control" placeholder="correo@institucion.com" />
                         <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="form-group mb-4">
                         <label asp-for="Phone" class="form-label">Teléfono</label>
                         <input asp-for="Phone" class="form-control" placeholder="+507 1234-5678" />
                         <span asp-validation-for="Phone" class="text-danger"></span>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="form-group mb-4">
-                        <label asp-for="InstitutionType" class="form-label">Tipo de Institución</label>
-                        <select asp-for="InstitutionType" class="form-control" required>
-                            <option value="">-- Seleccione un tipo --</option>
-                            <option value="1">Clínica</option>
-                            <option value="2">Hospital</option>
-                        </select>
-                        <span asp-validation-for="InstitutionType" class="text-danger"></span>
-                    </div>
-                </div>
             </div>
 
             <div class="form-group mb-4">
                 <label asp-for="Address" class="form-label">Dirección</label>
-                <input asp-for="Address" class="form-control" placeholder="Dirección completa" />
+                <input asp-for="Address" class="form-control" placeholder="Dirección completa de la institución" />
                 <span asp-validation-for="Address" class="text-danger"></span>
             </div>
 
@@ -114,11 +95,14 @@
                 </small>
             </div>
 
-            <div class="form-group mb-4">
-                <div class="form-check">
-                    <input asp-for="IsActive" class="form-check-input" type="checkbox" />
-                    <label asp-for="IsActive" class="form-check-label">Empresa Activa</label>
-                </div>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Nota:</strong> Los siguientes campos no pueden ser modificados desde aquí:
+                <ul class="mb-0 mt-2">
+                    <li>Prefijo de Carnet (definido al crear la institución)</li>
+                    <li>Tipo de Institución (Clínica/Hospital)</li>
+                    <li>Estado de la Institución (Activa/Inactiva)</li>
+                </ul>
             </div>
         </div>
         <div class="card-footer">
@@ -138,11 +122,34 @@
         $(document).ready(function() {
             $('#editInstitutionForm').on('submit', function(e) {
                 e.preventDefault();
-                submitFormAjax(this, {
-                    loadingMessage: 'Actualizando empresa...',
-                    successMessage: 'Empresa actualizada exitosamente'
+                
+                var form = this;
+                var formData = new FormData(form);
+                
+                // Usar FormData para envío con archivos
+                $.ajax({
+                    url: $(form).attr('action'),
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    beforeSend: function() {
+                        // Mostrar loading
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.href = response.redirectUrl || '@Url.Action("Index", "InstitutionConfig")';
+                        } else {
+                            alert(response.message || 'Error al actualizar los datos');
+                        }
+                    },
+                    error: function(xhr) {
+                        var response = xhr.responseJSON;
+                        alert(response?.message || 'Error al actualizar los datos');
+                    }
                 });
             });
         });
     </script>
 }
+

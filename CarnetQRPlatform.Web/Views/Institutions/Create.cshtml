@@ -1,4 +1,4 @@
-@model CarnetQRPlatform.Domain.Entities.Institution
+@model CarnetQRPlatform.Web.Models.CreateInstitutionViewModel
 @{
     ViewData["Title"] = "Nueva Empresa";
 }
@@ -10,25 +10,28 @@
             Nueva Empresa
         </h3>
     </div>
-    <form asp-action="Create" method="post" id="createInstitutionForm">
+    <form asp-action="Create" method="post" id="createInstitutionForm" enctype="multipart/form-data">
         <div class="card-body">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
+            <h5 class="mb-3"><i class="fas fa-building me-2"></i>Datos de la Institución</h5>
+            <hr />
+
             <div class="row">
                 <div class="col-md-6">
                     <div class="form-group mb-4">
-                        <label asp-for="Name" class="form-label">Nombre de la Empresa</label>
+                        <label asp-for="Name" class="form-label">Nombre de la Empresa <span class="text-danger">*</span></label>
                         <input asp-for="Name" class="form-control" placeholder="Ingrese el nombre de la empresa" required />
                         <span asp-validation-for="Name" class="text-danger"></span>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="form-group mb-4">
-                        <label asp-for="CardPrefix" class="form-label">Prefijo de Carnet</label>
-                        <input asp-for="CardPrefix" class="form-control" maxlength="10" placeholder="Ej: DEMO" required />
+                        <label asp-for="CardPrefix" class="form-label">Prefijo de Carnet <span class="text-danger">*</span></label>
+                        <input asp-for="CardPrefix" class="form-control" maxlength="10" placeholder="Ej: HEMO" required />
                         <span asp-validation-for="CardPrefix" class="text-danger"></span>
-                        <small class="form-text text-muted">Máximo 10 caracteres. Se usará para numerar los carnets.</small>
+                        <small class="form-text text-muted">Máximo 10 caracteres. Se usará para numerar los carnets (ej: HEMO-0001).</small>
                     </div>
                 </div>
             </div>
@@ -56,8 +59,12 @@
                 </div>
                 <div class="col-md-4">
                     <div class="form-group mb-4">
-                        <label asp-for="InstitutionType" class="form-label">Tipo de Empresa</label>
-                        <input asp-for="InstitutionType" class="form-control" placeholder="Ej: Clínica, Escuela, etc." />
+                        <label asp-for="InstitutionType" class="form-label">Tipo de Institución <span class="text-danger">*</span></label>
+                        <select asp-for="InstitutionType" class="form-control" required>
+                            <option value="">-- Seleccione un tipo --</option>
+                            <option value="1">Clínica</option>
+                            <option value="2">Hospital</option>
+                        </select>
                         <span asp-validation-for="InstitutionType" class="text-danger"></span>
                     </div>
                 </div>
@@ -69,16 +76,53 @@
                 <span asp-validation-for="Address" class="text-danger"></span>
             </div>
 
-            <div class="form-group mb-4">
-                <div class="form-check">
-                    <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
-                    <label asp-for="IsActive" class="form-check-label">Empresa Activa</label>
+            <hr class="my-4" />
+            <h5 class="mb-3"><i class="fas fa-user-shield me-2"></i>Datos del Administrador de la Institución</h5>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Se creará automáticamente un usuario Administrador para esta institución con las credenciales que proporcione.
+            </div>
+            <hr />
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="AdminEmail" class="form-label">Email del Administrador <span class="text-danger">*</span></label>
+                        <input asp-for="AdminEmail" type="email" class="form-control" placeholder="admin@institucion.com" required />
+                        <span asp-validation-for="AdminEmail" class="text-danger"></span>
+                        <small class="form-text text-muted">Este será el email de acceso del administrador.</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="AdminPassword" class="form-label">Contraseña del Administrador <span class="text-danger">*</span></label>
+                        <input asp-for="AdminPassword" type="password" class="form-control" placeholder="Mínimo 8 caracteres" required />
+                        <span asp-validation-for="AdminPassword" class="text-danger"></span>
+                        <small class="form-text text-muted">Debe tener al menos 8 caracteres, mayúsculas, minúsculas, números y símbolos.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="AdminFirstName" class="form-label">Nombre del Administrador <span class="text-danger">*</span></label>
+                        <input asp-for="AdminFirstName" class="form-control" placeholder="Ingrese el nombre" required />
+                        <span asp-validation-for="AdminFirstName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="AdminLastName" class="form-label">Apellido del Administrador <span class="text-danger">*</span></label>
+                        <input asp-for="AdminLastName" class="form-control" placeholder="Ingrese el apellido" required />
+                        <span asp-validation-for="AdminLastName" class="text-danger"></span>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Crear Empresa
+                <i class="fas fa-save"></i> Crear Empresa y Administrador
             </button>
             <a asp-action="Index" class="btn btn-secondary">
                 <i class="fas fa-times"></i> Cancelar
@@ -94,8 +138,8 @@
             $('#createInstitutionForm').on('submit', function(e) {
                 e.preventDefault();
                 submitFormAjax(this, {
-                    loadingMessage: 'Creando empresa...',
-                    successMessage: 'Empresa creada exitosamente'
+                    loadingMessage: 'Creando empresa y administrador...',
+                    successMessage: 'Empresa y administrador creados exitosamente'
                 });
             });
         });

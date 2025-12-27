@@ -1,3 +1,4 @@
+using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
@@ -10,30 +11,53 @@ using System.Security.Claims;
 
 namespace CarnetQRPlatform.Web.Controllers;
 
-[Authorize(Policy = "SuperAdminOnly")]
+[Authorize(Policy = "InstitutionAdminOrAbove")]
 public class UsersController : Controller
 {
     private readonly UserManager<AppUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IInstitutionService _institutionService;
+    private readonly ITenantProvider _tenantProvider;
+    private readonly IAuditService _auditService;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
         UserManager<AppUser> userManager,
         RoleManager<IdentityRole> roleManager,
         IInstitutionService institutionService,
+        ITenantProvider tenantProvider,
+        IAuditService auditService,
         ILogger<UsersController> logger)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _institutionService = institutionService;
+        _tenantProvider = tenantProvider;
+        _auditService = auditService;
         _logger = logger;
     }
 
     public async Task<IActionResult> Index()
     {
-        var users = await _userManager.Users
-            .Include(u => u.Institution)
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+        IQueryable<AppUser> usersQuery = _userManager.Users.Include(u => u.Institution);
+
+        // Si es InstitutionAdmin, filtrar solo usuarios de su institución
+        if (!isSuperAdmin)
+        {
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (tenantId.HasValue)
+            {
+                usersQuery = usersQuery.Where(u => u.InstitutionId == tenantId.Value);
+            }
+            else
+            {
+                // Si no hay tenant, no mostrar usuarios
+                usersQuery = usersQuery.Where(u => false);
+            }
+        }
+
+        var users = await usersQuery
             .OrderBy(u => u.LastName)
             .ThenBy(u => u.FirstName)
             .ToListAsync();
@@ -50,17 +74,40 @@ public class UsersController : Controller
         }
 
         ViewBag.UsersWithRoles = usersWithRoles;
+        ViewBag.IsSuperAdmin = isSuperAdmin;
         return View(users);
     }
 
     public async Task<IActionResult> Create()
     {
-        // Cargar instituciones activas y roles disponibles
-        var institutions = await _institutionService.GetAllAsync();
-        ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
         
-        var availableRoles = new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator };
+        // Si es InstitutionAdmin, solo puede crear usuarios para su institución
+        if (!isSuperAdmin)
+        {
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (!tenantId.HasValue)
+            {
+                TempData["ErrorMessage"] = "No tiene una institución asignada.";
+                return RedirectToAction(nameof(Index));
+            }
+            ViewBag.InstitutionId = tenantId.Value;
+            var institution = await _institutionService.GetByIdAsync(tenantId.Value);
+            ViewBag.InstitutionName = institution?.Name;
+        }
+        else
+        {
+            // SuperAdmin puede seleccionar institución
+            var institutions = await _institutionService.GetAllAsync();
+            ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+        }
+        
+        // InstitutionAdmin no puede crear otros InstitutionAdmin ni SuperAdmin
+        var availableRoles = isSuperAdmin 
+            ? new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator }
+            : new[] { Roles.Staff, Roles.AdministrativeOperator };
         ViewBag.AvailableRoles = availableRoles;
+        ViewBag.IsSuperAdmin = isSuperAdmin;
 
         return View();
     }
@@ -72,24 +119,65 @@ public class UsersController : Controller
         System.Console.WriteLine("=== [UsersController] Create ===");
         System.Console.WriteLine($"Email: {model.Email}, Role: {model.Role}, InstitutionId: {model.InstitutionId}");
 
-        // Validar que se seleccionó una institución si el rol no es SuperAdmin
-        if (model.Role != Roles.SuperAdmin && model.InstitutionId == Guid.Empty)
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+        
+        // Si es InstitutionAdmin, forzar su institución
+        if (!isSuperAdmin)
         {
-            ModelState.AddModelError(nameof(model.InstitutionId), "Debe seleccionar una empresa para este rol.");
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (!tenantId.HasValue)
+            {
+                ModelState.AddModelError("", "No tiene una institución asignada.");
+            }
+            else
+            {
+                model.InstitutionId = tenantId.Value;
+            }
+            
+            // InstitutionAdmin no puede crear otros InstitutionAdmin ni SuperAdmin
+            if (model.Role == Roles.SuperAdmin || model.Role == Roles.InstitutionAdmin)
+            {
+                ModelState.AddModelError(nameof(model.Role), "No tiene permisos para crear este tipo de usuario.");
+            }
         }
-
-        // Validar que SuperAdmin no tenga institución
-        if (model.Role == Roles.SuperAdmin && model.InstitutionId != Guid.Empty)
+        else
         {
-            ModelState.AddModelError(nameof(model.InstitutionId), "El SuperAdmin no puede tener una empresa asignada.");
+            // Validar que se seleccionó una institución si el rol no es SuperAdmin
+            if (model.Role != Roles.SuperAdmin && model.InstitutionId == Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(model.InstitutionId), "Debe seleccionar una empresa para este rol.");
+            }
+
+            // Validar que SuperAdmin no tenga institución
+            if (model.Role == Roles.SuperAdmin && model.InstitutionId != Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(model.InstitutionId), "El SuperAdmin no puede tener una empresa asignada.");
+            }
         }
 
         if (!ModelState.IsValid)
         {
-            var institutions = await _institutionService.GetAllAsync();
-            ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
-            var availableRoles = new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator };
+            if (isSuperAdmin)
+            {
+                var institutions = await _institutionService.GetAllAsync();
+                ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            }
+            else
+            {
+                var tenantId = _tenantProvider.GetCurrentTenantId();
+                if (tenantId.HasValue)
+                {
+                    ViewBag.InstitutionId = tenantId.Value;
+                    var institution = await _institutionService.GetByIdAsync(tenantId.Value);
+                    ViewBag.InstitutionName = institution?.Name;
+                }
+            }
+            
+            var availableRoles = isSuperAdmin 
+                ? new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator }
+                : new[] { Roles.Staff, Roles.AdministrativeOperator };
             ViewBag.AvailableRoles = availableRoles;
+            ViewBag.IsSuperAdmin = isSuperAdmin;
 
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -180,6 +268,19 @@ public class UsersController : Controller
                 _logger.LogInformation("User {Email} created with role {Role} and InstitutionId {InstitutionId}", 
                     user.Email, model.Role, user.InstitutionId);
 
+                // Registrar auditoría
+                if (user.InstitutionId.HasValue)
+                {
+                    var currentUserId = _userManager.GetUserId(User);
+                    await _auditService.LogActionAsync(
+                        user.InstitutionId.Value,
+                        currentUserId,
+                        "CREATE",
+                        "AppUser",
+                        user.Id,
+                        new Dictionary<string, object> { { "Email", user.Email }, { "Role", model.Role } });
+                }
+
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 {
                     return Json(new { success = true, message = "Usuario creado exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
@@ -259,11 +360,25 @@ public class UsersController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        var oldStatus = user.IsActive;
         user.IsActive = !user.IsActive;
         var result = await _userManager.UpdateAsync(user);
 
         if (result.Succeeded)
         {
+            // Registrar auditoría
+            if (user.InstitutionId.HasValue)
+            {
+                var currentUserId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    user.InstitutionId.Value,
+                    currentUserId,
+                    "TOGGLE_ACTIVE",
+                    "AppUser",
+                    user.Id,
+                    new Dictionary<string, object> { { "Email", user.Email ?? "" }, { "OldStatus", oldStatus }, { "NewStatus", user.IsActive } });
+            }
+            
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
                 return Json(new { success = true, message = "Estado del usuario actualizado." });

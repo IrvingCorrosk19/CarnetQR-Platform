@@ -4,6 +4,7 @@
     ViewData["Title"] = "Nueva Entidad";
     var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
     var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+    var photoEnabled = ViewBag.PhotoEnabled as bool? ?? false;
 }
 
 <div class="card fade-in">
@@ -13,7 +14,7 @@
             Nueva Entidad
         </h3>
     </div>
-    <form asp-action="Create" method="post" id="createEntityForm">
+    <form asp-action="Create" method="post" id="createEntityForm" enctype="multipart/form-data">
         <div class="card-body">
             @Html.AntiForgeryToken()
             @if (!isSuperAdmin)
@@ -99,6 +100,21 @@
                     <label asp-for="IsActive" class="form-check-label">Entidad Activa</label>
                 </div>
             </div>
+            
+            @* Input de foto solo si PhotoEnabled está activo *@
+            @if (photoEnabled || isSuperAdmin)
+            {
+                <div class="row" id="photoSection" style="@(isSuperAdmin ? "display:none;" : "")">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label for="PhotoFile" class="form-label">Foto del Paciente</label>
+                            <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                            <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB</small>
+                            <span asp-validation-for="PhotoPath" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
@@ -115,6 +131,37 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
         $(document).ready(function() {
+            @if (isSuperAdmin && institutions != null)
+            {
+                <text>
+                // Para SuperAdmin, actualizar PhotoEnabled según la institución seleccionada
+                $('#InstitutionId').on('change', function() {
+                    var institutionId = $(this).val();
+                    if (institutionId) {
+                        // Hacer petición AJAX para obtener PhotoEnabled de la institución
+                        $.ajax({
+                            url: '@Url.Action("GetInstitutionPhotoEnabled", "Institutions")',
+                            type: 'GET',
+                            data: { id: institutionId },
+                            success: function(data) {
+                                if (data.photoEnabled) {
+                                    $('#photoSection').show();
+                                } else {
+                                    $('#photoSection').hide();
+                                    $('#PhotoFile').val('');
+                                }
+                            },
+                            error: function() {
+                                $('#photoSection').hide();
+                            }
+                        });
+                    } else {
+                        $('#photoSection').hide();
+                    }
+                });
+                </text>
+            }
+            
             $('#createEntityForm').on('submit', function(e) {
                 e.preventDefault();
                 
@@ -135,19 +182,26 @@
                 console.log('InstitutionId value:', formDataObj['InstitutionId']);
                 console.log('==========================================');
                 
-                submitFormAjax(this, {
-                    loadingMessage: 'Creando entidad...',
-                    successMessage: 'Entidad creada exitosamente',
-                    redirectUrl: '@Url.Action("Index", "EntityProfiles")',
-                    successCallback: function(response) {
-                        console.log('=== FRONTEND SUCCESS LOG ===');
-                        console.log('Success response:', response);
-                        console.log('===========================');
+                // Usar FormData para envío con archivos
+                $.ajax({
+                    url: $(form).attr('action'),
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    beforeSend: function() {
+                        // Mostrar loading
                     },
-                    errorCallback: function(response) {
-                        console.error('=== FRONTEND ERROR LOG ===');
-                        console.error('Error response:', response);
-                        console.error('==========================');
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
+                        } else {
+                            alert(response.message || 'Error al crear la entidad');
+                        }
+                    },
+                    error: function(xhr) {
+                        var response = xhr.responseJSON;
+                        alert(response?.message || 'Error al crear la entidad');
                     }
                 });
             });

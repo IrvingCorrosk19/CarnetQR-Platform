@@ -1,8 +1,12 @@
 @model CarnetQRPlatform.Web.Models.CreateUserViewModel
+@using CarnetQRPlatform.Domain.Constants
 @{
     ViewData["Title"] = "Nuevo Usuario";
     var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
     var availableRoles = ViewBag.AvailableRoles as string[];
+    var isSuperAdmin = ViewBag.IsSuperAdmin as bool? ?? User.IsInRole(Roles.SuperAdmin);
+    var institutionId = ViewBag.InstitutionId as Guid?;
+    var institutionName = ViewBag.InstitutionName as string;
 }
 
 <div class="card fade-in">
@@ -78,25 +82,44 @@
                 </div>
             </div>
             
-            <div class="row" id="institutionRow">
-                <div class="col-md-12">
-                    <div class="form-group mb-4">
-                        <label asp-for="InstitutionId" class="form-label">Empresa <span class="text-danger">*</span></label>
-                        <select asp-for="InstitutionId" class="form-select" id="institutionSelect">
-                            <option value="">-- Seleccione una empresa --</option>
-                            @if (institutions != null)
-                            {
-                                @foreach (var institution in institutions)
+            @if (isSuperAdmin)
+            {
+                <div class="row" id="institutionRow">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label asp-for="InstitutionId" class="form-label">Empresa <span class="text-danger">*</span></label>
+                            <select asp-for="InstitutionId" class="form-select" id="institutionSelect">
+                                <option value="">-- Seleccione una empresa --</option>
+                                @if (institutions != null)
                                 {
-                                    <option value="@institution.Id">@institution.Name</option>
+                                    @foreach (var institution in institutions)
+                                    {
+                                        <option value="@institution.Id">@institution.Name</option>
+                                    }
                                 }
-                            }
-                        </select>
-                        <span asp-validation-for="InstitutionId" class="text-danger"></span>
-                        <small class="form-text text-muted">El usuario será asignado a esta empresa y solo podrá gestionar sus datos.</small>
+                            </select>
+                            <span asp-validation-for="InstitutionId" class="text-danger"></span>
+                            <small class="form-text text-muted">El usuario será asignado a esta empresa y solo podrá gestionar sus datos.</small>
+                        </div>
                     </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                @if (institutionId.HasValue)
+                {
+                    <input type="hidden" asp-for="InstitutionId" value="@institutionId.Value" />
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group mb-4">
+                                <label class="form-label">Empresa</label>
+                                <input type="text" class="form-control" value="@institutionName" readonly />
+                                <small class="form-text text-muted">El usuario será asignado a su institución.</small>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
@@ -113,20 +136,25 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
         $(document).ready(function() {
-            // Mostrar/ocultar selector de empresa según el rol
-            $('#roleSelect').on('change', function() {
-                var role = $(this).val();
-                if (role === 'SuperAdmin') {
-                    $('#institutionRow').hide();
-                    $('#institutionSelect').val('').removeAttr('required');
-                } else {
-                    $('#institutionRow').show();
-                    $('#institutionSelect').attr('required', 'required');
-                }
-            });
+            @if (isSuperAdmin)
+            {
+                <text>
+                // Mostrar/ocultar selector de empresa según el rol
+                $('#roleSelect').on('change', function() {
+                    var role = $(this).val();
+                    if (role === 'SuperAdmin') {
+                        $('#institutionRow').hide();
+                        $('#institutionSelect').val('').removeAttr('required');
+                    } else {
+                        $('#institutionRow').show();
+                        $('#institutionSelect').attr('required', 'required');
+                    }
+                });
 
-            // Trigger inicial
-            $('#roleSelect').trigger('change');
+                // Trigger inicial
+                $('#roleSelect').trigger('change');
+                </text>
+            }
 
             $('#createUserForm').on('submit', function(e) {
                 e.preventDefault();

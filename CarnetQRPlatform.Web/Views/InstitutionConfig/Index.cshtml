@@ -1,0 +1,166 @@
+@model CarnetQRPlatform.Domain.Entities.Institution
+@{
+    ViewData["Title"] = "Configuración de la Institución";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card fade-in">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-cog me-2"></i>
+                    Configuración de la Institución
+                </h3>
+            </div>
+            <div class="card-body">
+                @if (TempData["SuccessMessage"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        @TempData["SuccessMessage"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["ErrorMessage"] != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        @TempData["ErrorMessage"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card card-success card-outline">
+                            <div class="card-header">
+                                <h5 class="card-title">
+                                    <i class="fas fa-building me-2"></i>
+                                    Datos Básicos
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Edite los datos básicos de la institución: nombre, descripción, contacto y logo.</p>
+                                <a href="@Url.Action("Edit", "InstitutionConfig")" class="btn btn-success btn-block">
+                                    <i class="fas fa-edit me-2"></i>Editar Datos
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="card card-primary card-outline">
+                            <div class="card-header">
+                                <h5 class="card-title">
+                                    <i class="fas fa-id-card me-2"></i>
+                                    Configuración del Carnet
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Configure los campos visibles del carnet, foto y modo de visualización del QR público.</p>
+                                <a href="@Url.Action("CardSettings", "InstitutionConfig")" class="btn btn-primary btn-block">
+                                    <i class="fas fa-edit me-2"></i>Configurar Carnet
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="card card-info card-outline">
+                            <div class="card-header">
+                                <h5 class="card-title">
+                                    <i class="fas fa-qrcode me-2"></i>
+                                    QR Público
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Configure la información fija que se mostrará cuando se escanee el código QR.</p>
+                                <a href="@Url.Action("QrPublicSettings", "InstitutionConfig")" class="btn btn-info btn-block">
+                                    <i class="fas fa-edit me-2"></i>Configurar QR Público
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="card card-warning card-outline">
+                            <div class="card-header">
+                                <h5 class="card-title">
+                                    <i class="fas fa-eye me-2"></i>
+                                    Visibilidad de Datos
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Configure qué datos del paciente se mostrarán en el QR público (configuración global).</p>
+                                <a href="@Url.Action("PatientDataVisibility", "InstitutionConfig")" class="btn btn-warning btn-block">
+                                    <i class="fas fa-edit me-2"></i>Configurar Visibilidad
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Información Actual de la Institución
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-3">Nombre:</dt>
+                            <dd class="col-sm-9">@Model.Name</dd>
+
+                            <dt class="col-sm-3">Tipo:</dt>
+                            <dd class="col-sm-9">@(Model.InstitutionType?.ToString() ?? "-")</dd>
+
+                            <dt class="col-sm-3">Prefijo de Carnet:</dt>
+                            <dd class="col-sm-9"><span class="badge bg-info">@Model.CardPrefix</span></dd>
+
+                            <dt class="col-sm-3">Foto Habilitada:</dt>
+                            <dd class="col-sm-9">
+                                @if (Model.PhotoEnabled)
+                                {
+                                    <span class="badge bg-success">Sí</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">No</span>
+                                }
+                            </dd>
+
+                            <dt class="col-sm-3">Modo QR Público:</dt>
+                            <dd class="col-sm-9">
+                                @if (Model.QrPublicDisplayMode == CarnetQRPlatform.Domain.Entities.QrPublicDisplayMode.CardNumber)
+                                {
+                                    <span class="badge bg-primary">Número de Carnet</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-primary">Nombre del Paciente</span>
+                                }
+                            </dd>
+
+                            <dt class="col-sm-3">Campos Visibles:</dt>
+                            <dd class="col-sm-9">
+                                @if (Model.VisibleFields != null && Model.VisibleFields.Any())
+                                {
+                                    @foreach (var field in Model.VisibleFields)
+                                    {
+                                        <span class="badge bg-secondary me-1">@field</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Ninguno configurado</span>
+                                }
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

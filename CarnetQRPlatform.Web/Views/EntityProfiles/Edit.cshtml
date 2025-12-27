@@ -1,6 +1,7 @@
 @model CarnetQRPlatform.Domain.Entities.EntityProfile
 @{
     ViewData["Title"] = "Editar Entidad";
+    var photoEnabled = ViewBag.PhotoEnabled as bool? ?? false;
 }
 
 <div class="card fade-in">
@@ -10,7 +11,7 @@
             Editar Entidad
         </h3>
     </div>
-    <form asp-action="Edit" method="post" id="editEntityForm">
+    <form asp-action="Edit" method="post" id="editEntityForm" enctype="multipart/form-data">
         <div class="card-body">
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
@@ -74,6 +75,28 @@
                     <label asp-for="IsActive" class="form-check-label">Entidad Activa</label>
                 </div>
             </div>
+            
+            @* Input de foto solo si PhotoEnabled está activo *@
+            @if (photoEnabled)
+            {
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label for="PhotoFile" class="form-label">Foto del Paciente</label>
+                            @if (!string.IsNullOrEmpty(Model.PhotoPath))
+                            {
+                                <div class="mb-2">
+                                    <img src="@Model.PhotoPath" alt="Foto actual" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                                    <p class="text-muted small mt-1">Foto actual</p>
+                                </div>
+                            }
+                            <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                            <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. Deje vacío para mantener la foto actual.</small>
+                            <span asp-validation-for="PhotoPath" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
@@ -92,9 +115,31 @@
         $(document).ready(function() {
             $('#editEntityForm').on('submit', function(e) {
                 e.preventDefault();
-                submitFormAjax(this, {
-                    loadingMessage: 'Actualizando entidad...',
-                    successMessage: 'Entidad actualizada exitosamente'
+                
+                var form = this;
+                var formData = new FormData(form);
+                
+                // Usar FormData para envío con archivos
+                $.ajax({
+                    url: $(form).attr('action'),
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    beforeSend: function() {
+                        // Mostrar loading
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
+                        } else {
+                            alert(response.message || 'Error al actualizar la entidad');
+                        }
+                    },
+                    error: function(xhr) {
+                        var response = xhr.responseJSON;
+                        alert(response?.message || 'Error al actualizar la entidad');
+                    }
                 });
             });
         });

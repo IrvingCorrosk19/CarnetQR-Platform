@@ -49,8 +49,19 @@ public class QrController : Controller
             .OrderByDescending(e => e.ScheduledAt)
             .Take(10);
 
+        // Obtener la institución con su configuración
+        var institution = await _context.Institutions
+            .FirstOrDefaultAsync(i => i.Id == card.InstitutionId);
+
         ViewBag.UpcomingEvents = upcoming;
         ViewBag.HistoryEvents = history;
+        ViewBag.Institution = institution;
+
+        // Determinar qué mostrar según configuración
+        var displayMode = institution?.QrPublicDisplayMode ?? Domain.Entities.QrPublicDisplayMode.CardNumber;
+        ViewBag.DisplayIdentifier = displayMode == Domain.Entities.QrPublicDisplayMode.PatientName
+            ? $"{card.EntityProfile?.FirstName} {card.EntityProfile?.LastName}"
+            : card.CardNumber;
 
         // Generar código QR para mostrar en la vista pública
         var qrUrl = Url.Action("Show", "Qr", new { token = card.QrToken }, Request.Scheme) ?? 

@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Services.ICardService, Infrastructure.Services.CardService>();
         services.AddScoped<Application.Services.IEventService, Infrastructure.Services.EventService>();
         services.AddScoped<Application.Services.ICardTemplateService, Infrastructure.Services.CardTemplateService>();
+        services.AddScoped<IAuditService, AuditService>();
 
         services.AddAuthorization(options =>
         {

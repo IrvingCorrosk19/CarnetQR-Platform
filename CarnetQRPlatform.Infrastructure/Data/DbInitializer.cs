@@ -1,5 +1,6 @@
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
+using CarnetQRPlatform.Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -90,7 +91,7 @@ public static class DbInitializer
                 Name = "Empresa Demo",
                 Description = "Empresa de demostración",
                 CardPrefix = "DEMO",
-                InstitutionType = "Demo",
+                InstitutionType = InstitutionType.Clinica,
                 IsActive = true
             };
 
