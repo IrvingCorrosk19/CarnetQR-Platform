@@ -80,16 +80,27 @@
             <div class="row">
                 <div class="col-md-12">
                     <div class="form-group mb-4">
-                        <label for="PhotoFile" class="form-label">Foto del Paciente <span class="text-muted">(Opcional)</span></label>
+                        <label for="PhotoFile" class="form-label">
+                            <i class="fas fa-camera me-2"></i>Foto del Paciente 
+                            <span class="text-muted">(Opcional)</span>
+                        </label>
                         @if (!string.IsNullOrEmpty(Model.PhotoPath))
                         {
-                            <div class="mb-2">
-                                <img src="@Model.PhotoPath" alt="Foto actual" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                            <div class="mb-2" id="currentPhoto">
+                                <img src="@Model.PhotoPath" alt="Foto actual" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" id="currentPhotoImg" />
                                 <p class="text-muted small mt-1">Foto actual</p>
                             </div>
                         }
                         <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
-                        <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. Deje vacío para mantener la foto actual.</small>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. 
+                            Deje vacío para mantener la foto actual. Esta foto aparecerá en el carnet.
+                        </small>
+                        <div id="photoPreview" class="mt-2" style="display:none;">
+                            <img id="previewImage" src="" alt="Vista previa de nueva foto" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                            <p class="text-muted small mt-1">Nueva foto (vista previa)</p>
+                        </div>
                         <span asp-validation-for="PhotoPath" class="text-danger"></span>
                     </div>
                 </div>
@@ -110,6 +121,29 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
         $(document).ready(function() {
+            // Vista previa de imagen antes de subir
+            $('#PhotoFile').on('change', function(e) {
+                var file = e.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        $('#previewImage').attr('src', e.target.result);
+                        $('#photoPreview').show();
+                        // Ocultar foto actual si hay una nueva
+                        if ($('#currentPhoto').length) {
+                            $('#currentPhoto').fadeOut(200);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    $('#photoPreview').hide();
+                    // Mostrar foto actual si se cancela la selección
+                    if ($('#currentPhoto').length) {
+                        $('#currentPhoto').fadeIn(200);
+                    }
+                }
+            });
+
             $('#editEntityForm').on('submit', function(e) {
                 e.preventDefault();
                 
@@ -125,17 +159,20 @@
                     contentType: false,
                     beforeSend: function() {
                         // Mostrar loading
+                        $(form).find('button[type="submit"]').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Guardando...');
                     },
                     success: function(response) {
                         if (response.success) {
                             window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
                         } else {
                             alert(response.message || 'Error al actualizar la entidad');
+                            $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                         }
                     },
                     error: function(xhr) {
                         var response = xhr.responseJSON;
                         alert(response?.message || 'Error al actualizar la entidad');
+                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                     }
                 });
             });

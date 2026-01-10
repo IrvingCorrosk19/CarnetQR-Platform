@@ -102,12 +102,24 @@
             </div>
             
             @* Input de foto - SIEMPRE visible para permitir carga de imágenes *@
-            <div class="row" id="photoSection" style="@(isSuperAdmin ? "display:none;" : "")">
+            @* Para SuperAdmin: ocultar inicialmente, se mostrará cuando seleccione una institución *@
+            @* Para otros usuarios: siempre visible *@
+            <div class="row" id="photoSection" @if (isSuperAdmin) { <text>style="display:none;"</text> }>
                 <div class="col-md-12">
                     <div class="form-group mb-4">
-                        <label for="PhotoFile" class="form-label">Foto del Paciente <span class="text-muted">(Opcional)</span></label>
+                        <label for="PhotoFile" class="form-label">
+                            <i class="fas fa-camera me-2"></i>Foto del Paciente 
+                            <span class="text-muted">(Opcional)</span>
+                        </label>
                         <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
-                        <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB</small>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. Esta foto aparecerá en el carnet.
+                        </small>
+                        <div id="photoPreview" class="mt-2" style="display:none;">
+                            <img id="previewImage" src="" alt="Vista previa" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                            <p class="text-muted small mt-1">Vista previa</p>
+                        </div>
                         <span asp-validation-for="PhotoPath" class="text-danger"></span>
                     </div>
                 </div>
@@ -128,6 +140,21 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
         $(document).ready(function() {
+            // Vista previa de imagen antes de subir
+            $('#PhotoFile').on('change', function(e) {
+                var file = e.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        $('#previewImage').attr('src', e.target.result);
+                        $('#photoPreview').show();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    $('#photoPreview').hide();
+                }
+            });
+
             @if (isSuperAdmin && institutions != null)
             {
                 <text>
@@ -136,10 +163,11 @@
                     var institutionId = $(this).val();
                     if (institutionId) {
                         // Siempre mostrar la sección de foto para permitir carga
-                        $('#photoSection').show();
+                        $('#photoSection').slideDown(300);
                     } else {
-                        $('#photoSection').hide();
+                        $('#photoSection').slideUp(300);
                         $('#PhotoFile').val('');
+                        $('#photoPreview').hide();
                     }
                 });
                 </text>
