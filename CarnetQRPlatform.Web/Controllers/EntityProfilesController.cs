@@ -281,9 +281,23 @@ public class EntityProfilesController : Controller
             return NotFound();
         }
 
+        // Obtener la entidad existente para preservar PhotoPath si no se carga nueva foto
+        var existingEntity = await _entityProfileService.GetByIdAsync(id);
+        if (existingEntity == null)
+        {
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = "Entidad no encontrada." });
+            }
+            return NotFound();
+        }
+
         // InstitutionId ya está establecido desde el modelo cargado, no necesita validación
         ModelState.Remove(nameof(entityProfile.InstitutionId));
         ModelState.Remove(nameof(entityProfile.PhotoPath)); // PhotoPath se maneja por separado
+        
+        // Preservar PhotoPath existente por defecto
+        var currentPhotoPath = existingEntity.PhotoPath;
         
         // Manejar upload de foto - SIEMPRE permitido (no depende de PhotoEnabled)
         var photoFile = Request.Form.Files["PhotoFile"];
@@ -332,23 +346,47 @@ public class EntityProfilesController : Controller
                         }
 
                         // Eliminar foto anterior si existe
-                        if (!string.IsNullOrEmpty(entityProfile.PhotoPath) && entityProfile.PhotoPath.StartsWith("/uploads/photos/"))
+                        if (!string.IsNullOrEmpty(currentPhotoPath) && currentPhotoPath.StartsWith("/uploads/photos/"))
                         {
-                            var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", entityProfile.PhotoPath.TrimStart('/'));
+                            var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", currentPhotoPath.TrimStart('/'));
                             if (System.IO.File.Exists(oldFilePath))
                             {
-                                System.IO.File.Delete(oldFilePath);
+                                try
+                                {
+                                    System.IO.File.Delete(oldFilePath);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogWarning(ex, "No se pudo eliminar la foto anterior: {PhotoPath}", currentPhotoPath);
+                                }
                             }
                         }
 
+                        // Asignar nueva foto
                         entityProfile.PhotoPath = relativePath;
+                        currentPhotoPath = relativePath; // Actualizar para asegurar que se use
                     }
                 }
             }
         }
+        else
+        {
+            // Si no se carga nueva foto, preservar la foto existente
+            entityProfile.PhotoPath = currentPhotoPath;
+        }
+
+        // Asegurar que PhotoPath esté establecido (preservar existente o usar nueva)
+        if (string.IsNullOrEmpty(entityProfile.PhotoPath))
+        {
+            entityProfile.PhotoPath = currentPhotoPath;
+        }
 
         if (!ModelState.IsValid)
         {
+            // Si hay errores, recargar ViewBag necesario para la vista
+            var institution = await _institutionService.GetByIdAsync(existingEntity.InstitutionId);
+            ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
+            
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
                 var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
@@ -359,7 +397,23 @@ public class EntityProfilesController : Controller
 
         try
         {
+            // Asegurar que PhotoPath se preserve si no se carga nueva foto
+            if (string.IsNullOrEmpty(entityProfile.PhotoPath))
+            {
+                entityProfile.PhotoPath = currentPhotoPath;
+                _logger.LogInformation("Preservando PhotoPath existente: {PhotoPath} para EntityProfile {Id}", currentPhotoPath ?? "null", entityProfile.Id);
+            }
+            else
+            {
+                _logger.LogInformation("Usando nuevo PhotoPath: {PhotoPath} para EntityProfile {Id}", entityProfile.PhotoPath, entityProfile.Id);
+            }
+            
+            // Log final antes de actualizar
+            _logger.LogInformation("Actualizando EntityProfile {Id} con PhotoPath: {PhotoPath}", entityProfile.Id, entityProfile.PhotoPath ?? "null");
+            
             var updated = await _entityProfileService.UpdateAsync(entityProfile);
+            
+            _logger.LogInformation("EntityProfile {Id} actualizado exitosamente. PhotoPath guardado: {PhotoPath}", updated.Id, updated.PhotoPath ?? "null");
             
             // Registrar auditoría
             var userId = _userManager.GetUserId(User);
@@ -369,7 +423,7 @@ public class EntityProfilesController : Controller
                 "UPDATE",
                 "EntityProfile",
                 updated.Id.ToString(),
-                new Dictionary<string, object> { { "Name", $"{updated.FirstName} {updated.LastName}" } });
+                new Dictionary<string, object> { { "Name", $"{updated.FirstName} {updated.LastName}" }, { "PhotoPath", updated.PhotoPath ?? "null" } });
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -381,15 +435,17 @@ public class EntityProfilesController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating entity profile");
-            var errorMsg = "Error al actualizar la entidad.";
+            _logger.LogError(ex, "Error updating entity profile {Id}. PhotoPath intentado: {PhotoPath}", entityProfile.Id, entityProfile.PhotoPath ?? "null");
+            var errorMsg = $"Error al actualizar la entidad: {ex.Message}";
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
-                return Json(new { success = false, message = errorMsg });
+                return Json(new { success = false, message = errorMsg, exception = ex.Message });
             }
             
             ModelState.AddModelError("", errorMsg);
+            var institution = await _institutionService.GetByIdAsync(existingEntity.InstitutionId);
+            ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
             return View(entityProfile);
         }
     }
@@ -594,4 +650,5 @@ public class EntityProfilesController : Controller
         }
     }
 }
+
 

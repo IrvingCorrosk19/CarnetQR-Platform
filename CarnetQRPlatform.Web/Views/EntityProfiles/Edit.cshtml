@@ -16,6 +16,10 @@
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="InstitutionId" />
+            @if (!string.IsNullOrEmpty(Model.PhotoPath))
+            {
+                <input type="hidden" id="CurrentPhotoPath" value="@Model.PhotoPath" />
+            }
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
             
             <div class="row">
@@ -98,10 +102,11 @@
                             Deje vacío para mantener la foto actual. Esta foto aparecerá en el carnet.
                         </small>
                         <div id="photoPreview" class="mt-2" style="display:none;">
-                            <img id="previewImage" src="" alt="Vista previa de nueva foto" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
-                            <p class="text-muted small mt-1">Nueva foto (vista previa)</p>
+                            <img id="previewImage" src="" alt="Vista previa de nueva foto" class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 2px solid #28a745;" />
+                            <p class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Nueva foto (vista previa) - Se guardará correctamente</p>
                         </div>
                         <span asp-validation-for="PhotoPath" class="text-danger"></span>
+                        <div id="photoError" class="text-danger mt-1" style="display:none;"></div>
                     </div>
                 </div>
             </div>
@@ -150,6 +155,32 @@
                 var form = this;
                 var formData = new FormData(form);
                 
+                // Validar archivo de foto si se seleccionó uno
+                var photoFile = $('#PhotoFile')[0].files[0];
+                var photoError = $('#photoError');
+                photoError.hide().text('');
+                
+                if (photoFile) {
+                    // Validar tipo de archivo
+                    var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                    if (!allowedTypes.includes(photoFile.type)) {
+                        photoError.text('❌ Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).').show();
+                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
+                        return false;
+                    }
+                    
+                    // Validar tamaño (5MB máximo)
+                    if (photoFile.size > 5 * 1024 * 1024) {
+                        photoError.text('❌ El archivo no puede exceder 5MB.').show();
+                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
+                        return false;
+                    }
+                    
+                    console.log('Foto seleccionada:', photoFile.name, photoFile.size, 'bytes');
+                } else {
+                    console.log('No se seleccionó nueva foto - se preservará la foto actual');
+                }
+                
                 // Usar FormData para envío con archivos
                 $.ajax({
                     url: $(form).attr('action'),
@@ -163,15 +194,45 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Éxito!',
+                                text: 'Entidad actualizada exitosamente.',
+                                timer: 2000,
+                                showConfirmButton: false
+                            }).then(function() {
+                                window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
+                            });
                         } else {
-                            alert(response.message || 'Error al actualizar la entidad');
+                            var errorMsg = response.message || 'Error al actualizar la entidad';
+                            if (response.errors && response.errors.PhotoFile) {
+                                photoError.text('❌ ' + response.errors.PhotoFile.join(', ')).show();
+                            }
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: errorMsg
+                            });
                             $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                         }
                     },
                     error: function(xhr) {
                         var response = xhr.responseJSON;
-                        alert(response?.message || 'Error al actualizar la entidad');
+                        var errorMsg = response?.message || 'Error al actualizar la entidad';
+                        
+                        // Mostrar error específico de foto si existe
+                        if (response?.errors && response.errors.PhotoFile) {
+                            photoError.text('❌ ' + response.errors.PhotoFile.join(', ')).show();
+                        } else if (response?.errors) {
+                            var allErrors = Object.values(response.errors).flat().join(', ');
+                            photoError.text('❌ ' + allErrors).show();
+                        }
+                        
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg
+                        });
                         $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                     }
                 });
