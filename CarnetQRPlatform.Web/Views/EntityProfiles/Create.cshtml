@@ -102,25 +102,24 @@
             </div>
             
             @* Input de foto - SIEMPRE visible para permitir carga de imágenes *@
-            @* Para SuperAdmin: ocultar inicialmente, se mostrará cuando seleccione una institución *@
-            @* Para otros usuarios: siempre visible *@
-            <div class="row" id="photoSection" @if (isSuperAdmin) { <text>style="display:none;"</text> }>
+            <div class="row" id="photoSection" @if (isSuperAdmin) { <text>style="@(!isSuperAdmin ? "" : "display:none;")"</text> }>
                 <div class="col-md-12">
                     <div class="form-group mb-4">
                         <label for="PhotoFile" class="form-label">
-                            <i class="fas fa-camera me-2"></i>Foto del Paciente 
+                            <i class="fas fa-camera me-2"></i>Foto para el Carnet 
                             <span class="text-muted">(Opcional)</span>
                         </label>
-                        <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                        <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" required="false" />
                         <small class="form-text text-muted">
                             <i class="fas fa-info-circle me-1"></i>
-                            Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. Esta foto aparecerá en el carnet.
+                            Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. La foto aparecerá en el frente del carnet.
                         </small>
                         <div id="photoPreview" class="mt-2" style="display:none;">
-                            <img id="previewImage" src="" alt="Vista previa" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
-                            <p class="text-muted small mt-1">Vista previa</p>
+                            <img id="previewImage" src="" alt="Vista previa" class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 2px solid #28a745;" />
+                            <p class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Vista previa - La foto se cargará correctamente</p>
                         </div>
                         <span asp-validation-for="PhotoPath" class="text-danger"></span>
+                        <div id="photoError" class="text-danger mt-1" style="display:none;"></div>
                     </div>
                 </div>
             </div>
@@ -143,7 +142,28 @@
             // Vista previa de imagen antes de subir
             $('#PhotoFile').on('change', function(e) {
                 var file = e.target.files[0];
+                var photoError = $('#photoError');
+                photoError.hide().text('');
+                
                 if (file) {
+                    // Validar tipo de archivo
+                    var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                    if (!allowedTypes.includes(file.type)) {
+                        photoError.text('❌ Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).').show();
+                        $(this).val('');
+                        $('#photoPreview').hide();
+                        return;
+                    }
+                    
+                    // Validar tamaño (5MB máximo)
+                    if (file.size > 5 * 1024 * 1024) {
+                        photoError.text('❌ El archivo no puede exceder 5MB.').show();
+                        $(this).val('');
+                        $('#photoPreview').hide();
+                        return;
+                    }
+                    
+                    // Mostrar vista previa
                     var reader = new FileReader();
                     reader.onload = function(e) {
                         $('#previewImage').attr('src', e.target.result);
@@ -161,15 +181,23 @@
                 // Para SuperAdmin, mostrar sección de foto cuando selecciona una institución
                 $('#InstitutionId').on('change', function() {
                     var institutionId = $(this).val();
-                    if (institutionId) {
+                    if (institutionId && institutionId !== '') {
                         // Siempre mostrar la sección de foto para permitir carga
-                        $('#photoSection').slideDown(300);
+                        $('#photoSection').slideDown(300, function() {
+                            $('#PhotoFile').focus();
+                        });
                     } else {
                         $('#photoSection').slideUp(300);
                         $('#PhotoFile').val('');
                         $('#photoPreview').hide();
+                        $('#photoError').hide();
                     }
                 });
+                
+                // Si ya hay una institución seleccionada al cargar, mostrar el campo
+                if ($('#InstitutionId').val() && $('#InstitutionId').val() !== '') {
+                    $('#photoSection').show();
+                }
                 </text>
             }
             
@@ -193,6 +221,12 @@
                 console.log('InstitutionId value:', formDataObj['InstitutionId']);
                 console.log('==========================================');
                 
+                // Validar que se haya seleccionado una foto si el campo está visible
+                var photoFile = $('#PhotoFile')[0].files[0];
+                if ($('#photoSection').is(':visible') && photoFile) {
+                    console.log('Foto seleccionada:', photoFile.name, photoFile.size, 'bytes');
+                }
+                
                 // Usar FormData para envío con archivos
                 $.ajax({
                     url: $(form).attr('action'),
@@ -202,17 +236,29 @@
                     contentType: false,
                     beforeSend: function() {
                         // Mostrar loading
+                        $(form).find('button[type="submit"]').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Guardando...');
                     },
                     success: function(response) {
                         if (response.success) {
                             window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
                         } else {
                             alert(response.message || 'Error al crear la entidad');
+                            $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Crear Entidad');
                         }
                     },
                     error: function(xhr) {
                         var response = xhr.responseJSON;
-                        alert(response?.message || 'Error al crear la entidad');
+                        var errorMsg = response?.message || 'Error al crear la entidad';
+                        
+                        // Mostrar error específico de foto si existe
+                        if (response?.errors && response.errors.PhotoFile) {
+                            $('#photoError').text('❌ ' + response.errors.PhotoFile.join(', ')).show();
+                        } else {
+                            $('#photoError').text('❌ ' + errorMsg).show();
+                        }
+                        
+                        alert(errorMsg);
+                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Crear Entidad');
                     }
                 });
             });

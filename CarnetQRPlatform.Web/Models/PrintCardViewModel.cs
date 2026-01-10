@@ -40,15 +40,15 @@ public class PrintCardConfig
     public bool BackRotate180 { get; set; } = false; // Rotar 180° la trasera para impresoras de dos caras
     
     // ==================== COLORES Y ESTILOS ====================
-    public string PrimaryColor { get; set; } = "#667eea";
-    public string SecondaryColor { get; set; } = "#764ba2";
-    public string BackgroundColor { get; set; } = "#ffffff";
-    public string BackgroundGradient { get; set; } = ""; // Ej: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-    public string TextColor { get; set; } = "#2c3e50";
-    public string BorderColor { get; set; } = "#667eea";
+    public string PrimaryColor { get; set; } = "#1e3a8a"; // Azul corporativo oscuro profesional
+    public string SecondaryColor { get; set; } = "#3b82f6"; // Azul medio corporativo
+    public string BackgroundColor { get; set; } = "#ffffff"; // Blanco limpio
+    public string BackgroundGradient { get; set; } = ""; // Sin gradiente por defecto (diseño limpio)
+    public string TextColor { get; set; } = "#1f2937"; // Gris oscuro profesional
+    public string BorderColor { get; set; } = "#e5e7eb"; // Gris claro suave
     public string BorderStyle { get; set; } = "solid"; // solid, dashed, dotted, double
-    public double BorderWidth { get; set; } = 2.0; // mm
-    public double BorderRadius { get; set; } = 10.0; // mm
+    public double BorderWidth { get; set; } = 1.0; // mm - borde más delgado y profesional
+    public double BorderRadius { get; set; } = 5.0; // mm - esquinas más sutiles
     
     // ==================== FUENTES ====================
     public string FontFamily { get; set; } = "Segoe UI, Tahoma, Geneva, Verdana, sans-serif";
@@ -100,7 +100,7 @@ public class PrintCardConfig
     // ==================== TRASERA ====================
     public string BackContent { get; set; } = "qr"; // qr, info, custom
     public string BackTextAlignment { get; set; } = "center"; // left, center, right
-    public string BackBackgroundColor { get; set; } = "#f8f9fa";
+    public string BackBackgroundColor { get; set; } = "#ffffff"; // Blanco limpio y profesional
     public string BackInstructions { get; set; } = "Escanea el código QR para verificar la información del carnet";
     public bool BackShowInstitutionName { get; set; } = true;
     public bool BackShowCardNumber { get; set; } = true;

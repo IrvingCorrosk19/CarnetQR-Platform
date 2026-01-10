@@ -111,14 +111,14 @@
             min-height: 100vh;
         }
 
-        /* Contenedor del carnet con todas las configuraciones */
+        /* Contenedor del carnet con todas las configuraciones - Diseño profesional */
         .carnet-container {
             width: @(width)mm;
             height: @(height)mm;
             background: @(config.ShowGradient ? bgGradient : bgColor);
             border-radius: @(config.BorderRadius)mm;
             @if (config.ShowShadow) {
-                <text>box-shadow: 0 4px 20px rgba(0, 0, 0, @config.ShadowOpacity);</text>
+                <text>box-shadow: 0 2px 8px rgba(0, 0, 0, @config.ShadowOpacity);</text>
             }
             padding: @(config.Padding)mm;
             position: relative;
@@ -153,8 +153,8 @@
             </text>
         }
         
-        /* Decoración de fondo sutil (solo si no es simple) */
-        @if (!isSimple && config.ShowGradient) {
+        /* Decoración de fondo sutil - Solo si está explícitamente habilitado */
+        @if (config.ShowGradient && !string.IsNullOrEmpty(config.BackgroundGradient)) {
             <text>
             .carnet-container::before {
                 content: '';
@@ -163,21 +163,22 @@
                 right: -20%;
                 width: 150%;
                 height: 150%;
-                background: radial-gradient(circle, @config.PrimaryColor@(Convert.ToInt32(config.ShadowOpacity * 255).ToString("X2")) 0%, transparent 70%);
+                background: radial-gradient(circle, @config.SecondaryColor@(Convert.ToInt32(config.ShadowOpacity * 50).ToString("X2")) 0%, transparent 70%);
                 pointer-events: none;
                 z-index: 0;
+                opacity: 0.3;
             }
             </text>
         }
 
-        /* Header con logo y nombre de institución - Posicionamiento dinámico */
+        /* Header con logo y nombre de institución - Posicionamiento dinámico profesional */
         .carnet-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: @(config.SpacingBetweenElements)mm;
             padding-bottom: 3mm;
-            border-bottom: 2px solid @config.PrimaryColor;
+            border-bottom: 1px solid @config.BorderColor;
             position: relative;
             z-index: 1;
             text-align: @config.TextAlignment;
@@ -423,7 +424,7 @@
             background: @(config.BackBackgroundColor);
             border-radius: @(config.BorderRadius)mm;
             @if (config.ShowShadow) {
-                <text>box-shadow: 0 4px 20px rgba(0, 0, 0, @config.ShadowOpacity);</text>
+                <text>box-shadow: 0 2px 8px rgba(0, 0, 0, @config.ShadowOpacity);</text>
             }
             padding: @(config.Padding)mm;
             position: relative;
@@ -440,52 +441,67 @@
             color: @config.TextColor;
         }
 
+        @* Eliminar gradiente de fondo en la trasera para diseño limpio *@
         .carnet-container-back::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -20%;
-            width: 150%;
-            height: 150%;
-            background: radial-gradient(circle, @config.SecondaryColor@(Convert.ToInt32(config.ShadowOpacity * 100).ToString("X2")) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: 0;
+            display: none;
         }
 
         .carnet-back-content {
-            text-align: @config.BackTextAlignment;
+            text-align: center;
             position: relative;
             z-index: 1;
             width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 0;
         }
 
         .carnet-back-qr {
-            margin-bottom: 5mm;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            flex: 0 0 auto;
         }
 
         .carnet-back-qr img {
             width: @(config.QrBackSize)mm;
             height: @(config.QrBackSize)mm;
-            border: 2px solid @config.PrimaryColor;
-            border-radius: @(config.BorderRadius / 2)mm;
-            padding: 3mm;
+            border: 1px solid @config.BorderColor;
+            border-radius: 3mm;
+            padding: 2mm;
             background: white;
+            display: block;
+            margin: 0 auto;
             @if (config.ShowShadow) {
-                <text>box-shadow: 0 2px 10px rgba(0, 0, 0, @(config.ShadowOpacity * 0.8));</text>
+                <text>box-shadow: 0 1px 3px rgba(0, 0, 0, @(config.ShadowOpacity * 0.5));</text>
             }
         }
 
         .carnet-back-text {
             font-size: @(config.FontSizeDetails)pt;
             color: @config.TextColor;
-            margin-top: 3mm;
+            margin-top: 4mm;
+            text-align: center;
+            width: 100%;
+            font-weight: 600;
         }
 
         .carnet-back-instruction {
             font-size: @(config.FontSizeDetails - 1)pt;
             color: @config.TextColor;
-            opacity: 0.8;
-            margin-top: 2mm;
+            opacity: 0.7;
+            margin-top: 3mm;
+            text-align: center;
+            width: 100%;
+            line-height: 1.4;
+            padding: 0 2mm;
         }
 
         /* Separador visual entre frente y trasera (solo en pantalla) */
@@ -786,7 +802,7 @@
                     </div>
                     @if (config.BackShowInstitutionName)
                     {
-                        <div class="carnet-back-text">
+                        <div class="carnet-back-text" style="margin-top: 6mm;">
                             <strong>@Model.InstitutionName</strong>
                         </div>
                     }
@@ -795,7 +811,7 @@
                     </div>
                     @if (config.BackShowCardNumber)
                     {
-                        <div class="carnet-back-text" style="margin-top: 3mm; font-size: 7pt;">
+                        <div class="carnet-back-text" style="margin-top: 3mm; font-size: 7pt; font-weight: 400;">
                             Carnet: @Model.CardNumber
                         </div>
                     }
