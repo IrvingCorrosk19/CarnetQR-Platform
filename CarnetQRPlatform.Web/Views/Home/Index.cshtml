@@ -1,8 +1,10 @@
-﻿@{
+﻿@model CarnetQRPlatform.Web.Models.DashboardViewModel
+@using CarnetQRPlatform.Domain.Enums
+@{
     ViewData["Title"] = "Dashboard";
 }
 
-@if (User.IsInRole("SuperAdmin"))
+@if (Model.IsSuperAdmin)
 {
     <div class="alert alert-info alert-dismissible fade show" role="alert">
         <strong><i class="fas fa-building me-2"></i>Acceso Rápido:</strong>
@@ -14,10 +16,28 @@
 }
 
 <div class="row">
-    <div class="col-lg-3 col-6">
+    @if (Model.IsSuperAdmin)
+    {
+        <div class="col-lg-2-4 col-6">
+            <div class="small-box bg-primary">
+                <div class="inner">
+                    <h3>@Model.TotalInstitutions</h3>
+                    <p>Instituciones</p>
+                </div>
+                <div class="icon">
+                    <i class="fas fa-building"></i>
+                </div>
+                <a href="@Url.Action("Index", "Institutions")" class="small-box-footer">
+                    Más información <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+    }
+    
+    <div class="@(Model.IsSuperAdmin ? "col-lg-2-4 col-6" : "col-lg-3 col-6")">
         <div class="small-box bg-info">
             <div class="inner">
-                <h3>150</h3>
+                <h3>@Model.TotalEntities</h3>
                 <p>Total Entidades</p>
             </div>
             <div class="icon">
@@ -29,10 +49,10 @@
         </div>
     </div>
 
-    <div class="col-lg-3 col-6">
+    <div class="@(Model.IsSuperAdmin ? "col-lg-2-4 col-6" : "col-lg-3 col-6")">
         <div class="small-box bg-success">
             <div class="inner">
-                <h3>145</h3>
+                <h3>@Model.ActiveCards</h3>
                 <p>Carnets Activos</p>
             </div>
             <div class="icon">
@@ -44,10 +64,10 @@
         </div>
     </div>
 
-    <div class="col-lg-3 col-6">
+    <div class="@(Model.IsSuperAdmin ? "col-lg-2-4 col-6" : "col-lg-3 col-6")">
         <div class="small-box bg-warning">
             <div class="inner">
-                <h3>25</h3>
+                <h3>@Model.ScheduledEvents</h3>
                 <p>Eventos Programados</p>
             </div>
             <div class="icon">
@@ -59,18 +79,25 @@
         </div>
     </div>
 
-    <div class="col-lg-3 col-6">
+    <div class="@(Model.IsSuperAdmin ? "col-lg-2-4 col-6" : "col-lg-3 col-6")">
         <div class="small-box bg-danger">
             <div class="inner">
-                <h3>85%</h3>
+                <h3>@Model.CompletionRate.ToString("F1")%</h3>
                 <p>Tasa de Cumplimiento</p>
             </div>
             <div class="icon">
                 <i class="fas fa-chart-line"></i>
             </div>
-            <a href="@Url.Action("Index", "Statistics")" class="small-box-footer">
-                Más información <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            @if (User.IsInRole("SuperAdmin") || User.IsInRole("InstitutionAdmin"))
+            {
+                <a href="@Url.Action("Index", "Statistics")" class="small-box-footer">
+                    Más información <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            }
+            else
+            {
+                <div class="small-box-footer"></div>
+            }
         </div>
     </div>
 </div>
@@ -84,8 +111,69 @@
                     Actividad Reciente
                 </h3>
             </div>
-            <div class="card-body">
-                <p class="text-muted">Actividad reciente de eventos y carnets aparecerá aquí.</p>
+            <div class="card-body p-0">
+                @if (Model.RecentEvents.Any() || Model.RecentCards.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <tbody>
+                                @foreach (var evt in Model.RecentEvents.Take(5))
+                                {
+                                    <tr>
+                                        <td width="40">
+                                            <i class="fas fa-calendar-check text-info"></i>
+                                        </td>
+                                        <td>
+                                            <strong>@evt.EntityProfile?.FirstName @evt.EntityProfile?.LastName</strong><br>
+                                            <small class="text-muted">
+                                                @evt.ScheduledAt.ToString("dd/MM/yyyy HH:mm")
+                                                @if (Model.IsSuperAdmin)
+                                                {
+                                                    <text> - @evt.Institution?.Name</text>
+                                                }
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-@(evt.Status == EventStatus.Completed ? "success" : evt.Status == EventStatus.NotCompleted ? "danger" : "warning")">
+                                                @evt.Status
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                                @foreach (var card in Model.RecentCards.Take(5))
+                                {
+                                    <tr>
+                                        <td width="40">
+                                            <i class="fas fa-id-card text-success"></i>
+                                        </td>
+                                        <td>
+                                            <strong>Carnet @card.CardNumber</strong><br>
+                                            <small class="text-muted">
+                                                @card.EntityProfile?.FirstName @card.EntityProfile?.LastName
+                                                @if (Model.IsSuperAdmin)
+                                                {
+                                                    <text> - @card.Institution?.Name</text>
+                                                }
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-@(card.IsActive ? "success" : "secondary")">
+                                                @(card.IsActive ? "Activo" : "Inactivo")
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                        <p>No hay actividad reciente</p>
+                    </div>
+                }
             </div>
         </div>
     </div>
@@ -98,9 +186,71 @@
                     Eventos Próximos
                 </h3>
             </div>
-            <div class="card-body">
-                <p class="text-muted">Listado de eventos próximos aparecerá aquí.</p>
+            <div class="card-body p-0">
+                @if (Model.UpcomingEvents.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <tbody>
+                                @foreach (var evt in Model.UpcomingEvents)
+                                {
+                                    <tr>
+                                        <td width="40">
+                                            <i class="fas fa-calendar-alt text-warning"></i>
+                                        </td>
+                                        <td>
+                                            <strong>@evt.EntityProfile?.FirstName @evt.EntityProfile?.LastName</strong><br>
+                                            <small class="text-muted">
+                                                @evt.ScheduledAt.ToString("dd/MM/yyyy HH:mm")
+                                                @if (Model.IsSuperAdmin)
+                                                {
+                                                    <text> - @evt.Institution?.Name</text>
+                                                }
+                                            </small>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(evt.Notes))
+                                            {
+                                                <small class="text-muted d-block" title="@evt.Notes">
+                                                    @(evt.Notes.Length > 30 ? evt.Notes.Substring(0, 30) + "..." : evt.Notes)
+                                                </small>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-calendar-times fa-2x mb-2"></i>
+                        <p>No hay eventos próximos programados</p>
+                    </div>
+                }
             </div>
+            @if (Model.UpcomingEvents.Any())
+            {
+                <div class="card-footer text-center">
+                    <a href="@Url.Action("Index", "Events")" class="btn btn-sm btn-primary">
+                        Ver todos los eventos <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            }
         </div>
     </div>
 </div>
+
+<style>
+    .col-lg-2-4 {
+        flex: 0 0 20%;
+        max-width: 20%;
+    }
+    @@media (max-width: 991px) {
+        .col-lg-2-4 {
+            flex: 0 0 50%;
+            max-width: 50%;
+        }
+    }
+</style>
