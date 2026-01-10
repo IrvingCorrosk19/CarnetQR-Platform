@@ -2,6 +2,8 @@ using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Infrastructure.Data;
+using CarnetQRPlatform.Application.Common;
+using CarnetQRPlatform.Application.Extensions;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 
@@ -22,6 +24,19 @@ public class CardService : ICardService
     {
         var query = _context.Cards.Include(c => c.EntityProfile).Include(c => c.Institution).AsQueryable();
         return await query.ApplyTenantFilter(_tenantProvider).OrderByDescending(c => c.IssuedAt).ToListAsync();
+    }
+
+    public async Task<PagedResult<Card>> GetAllPagedAsync(PaginationParameters parameters)
+    {
+        var query = _context.Cards
+            .Include(c => c.EntityProfile)
+            .Include(c => c.Institution)
+            .AsQueryable();
+        
+        return await query
+            .ApplyTenantFilter(_tenantProvider)
+            .OrderByDescending(c => c.IssuedAt)
+            .ToPagedResultAsync(parameters);
     }
 
     public async Task<Card?> GetByIdAsync(Guid id)

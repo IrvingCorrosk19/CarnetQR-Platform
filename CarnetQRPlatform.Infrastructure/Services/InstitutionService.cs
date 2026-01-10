@@ -11,23 +11,58 @@ public class InstitutionService : IInstitutionService
 {
     private readonly ApplicationDbContext _context;
     private readonly ITenantProvider _tenantProvider;
+    private readonly ICacheService _cacheService;
 
-    public InstitutionService(ApplicationDbContext context, ITenantProvider tenantProvider)
+    public InstitutionService(ApplicationDbContext context, ITenantProvider tenantProvider, ICacheService cacheService)
     {
         _context = context;
         _tenantProvider = tenantProvider;
+        _cacheService = cacheService;
     }
 
     public async Task<IEnumerable<Institution>> GetAllAsync()
     {
-        return await _context.Institutions
+        const string cacheKey = "institutions_all";
+        
+        // Intentar obtener desde caché
+        var cached = await _cacheService.GetAsync<IEnumerable<Institution>>(cacheKey);
+        if (cached != null)
+        {
+            return cached;
+        }
+
+        // Si no está en caché, obtener de base de datos
+        var institutions = await _context.Institutions
             .OrderBy(i => i.Name)
             .ToListAsync();
+
+        // Guardar en caché por 30 minutos
+        await _cacheService.SetAsync(cacheKey, institutions, TimeSpan.FromMinutes(30));
+        
+        return institutions;
     }
 
     public async Task<Institution?> GetByIdAsync(Guid id)
     {
-        return await _context.Institutions.FindAsync(id);
+        var cacheKey = $"institution_{id}";
+        
+        // Intentar obtener desde caché
+        var cached = await _cacheService.GetAsync<Institution>(cacheKey);
+        if (cached != null)
+        {
+            return cached;
+        }
+
+        // Si no está en caché, obtener de base de datos
+        var institution = await _context.Institutions.FindAsync(id);
+        
+        if (institution != null)
+        {
+            // Guardar en caché por 30 minutos
+            await _cacheService.SetAsync(cacheKey, institution, TimeSpan.FromMinutes(30));
+        }
+
+        return institution;
     }
 
     public async Task<Institution> CreateAsync(Institution institution)
@@ -49,6 +84,9 @@ public class InstitutionService : IInstitutionService
         try
         {
             await _context.SaveChangesAsync();
+            
+            // Invalidar caché
+            await _cacheService.RemoveAsync("institutions_all");
             
             // Inicializar templates predefinidos para la nueva institución
             try
@@ -81,6 +119,11 @@ public class InstitutionService : IInstitutionService
         institution.UpdatedAt = DateTime.UtcNow;
         _context.Institutions.Update(institution);
         await _context.SaveChangesAsync();
+        
+        // Invalidar caché
+        await _cacheService.RemoveAsync("institutions_all");
+        await _cacheService.RemoveAsync($"institution_{institution.Id}");
+        
         return institution;
     }
 
@@ -91,6 +134,11 @@ public class InstitutionService : IInstitutionService
 
         _context.Institutions.Remove(institution);
         await _context.SaveChangesAsync();
+        
+        // Invalidar caché
+        await _cacheService.RemoveAsync("institutions_all");
+        await _cacheService.RemoveAsync($"institution_{id}");
+        
         return true;
     }
 
@@ -102,6 +150,11 @@ public class InstitutionService : IInstitutionService
         institution.IsActive = !institution.IsActive;
         institution.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+        
+        // Invalidar caché
+        await _cacheService.RemoveAsync("institutions_all");
+        await _cacheService.RemoveAsync($"institution_{id}");
+        
         return true;
     }
 }

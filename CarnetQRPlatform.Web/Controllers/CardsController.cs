@@ -1,5 +1,6 @@
 using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
+using CarnetQRPlatform.Application.Common;
 using CarnetQRPlatform.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -30,10 +31,20 @@ public class CardsController : Controller
         _qrCodeService = qrCodeService;
     }
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
     {
-        var cards = await _cardService.GetAllAsync();
-        return View(cards);
+        var parameters = new PaginationParameters(page, pageSize);
+        var pagedCards = await _cardService.GetAllPagedAsync(parameters);
+        
+        // Pasar datos de paginación a la vista
+        ViewBag.CurrentPage = pagedCards.PageNumber;
+        ViewBag.PageSize = pagedCards.PageSize;
+        ViewBag.TotalPages = pagedCards.TotalPages;
+        ViewBag.HasPreviousPage = pagedCards.HasPreviousPage;
+        ViewBag.HasNextPage = pagedCards.HasNextPage;
+        ViewBag.TotalCount = pagedCards.TotalCount;
+        
+        return View(pagedCards.Items);
     }
 
     public async Task<IActionResult> Details(Guid id)

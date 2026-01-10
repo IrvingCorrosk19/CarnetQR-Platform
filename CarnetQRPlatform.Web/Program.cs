@@ -19,6 +19,10 @@ builder.Services.AddControllersWithViews();
 // Add Infrastructure services
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Add caching services
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<CarnetQRPlatform.Application.Services.ICacheService, CarnetQRPlatform.Application.Services.MemoryCacheService>();
+
 // Add QR Code Service
 builder.Services.AddScoped<CarnetQRPlatform.Web.Services.QrCodeService>();
 
