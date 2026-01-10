@@ -4,6 +4,7 @@ using CarnetQRPlatform.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace CarnetQRPlatform.Web.Controllers;
 
@@ -40,21 +41,20 @@ public class QrController : Controller
             return NotFound();
         }
 
-        var upcomingEvents = await _eventService.GetByEntityProfileAsync(card.EntityProfileId);
-        var upcoming = upcomingEvents.Where(e => e.ScheduledAt >= DateTime.UtcNow && e.Status == Domain.Entities.EventStatus.Scheduled)
-            .OrderBy(e => e.ScheduledAt)
-            .Take(5);
-
-        var history = upcomingEvents.Where(e => e.ScheduledAt < DateTime.UtcNow || e.Status != Domain.Entities.EventStatus.Scheduled)
+        // Cargar eventos relacionados con la entidad, filtrando por la institución del carnet para seguridad
+        // (en endpoint público no hay tenant, pero debemos asegurar que solo vea eventos de la misma institución)
+        var allEvents = await _eventService.GetByEntityProfileAsync(card.EntityProfileId);
+        // Filtrar adicionalmente por InstitutionId del card para seguridad en endpoint público
+        var eventsList = allEvents
+            .Where(e => e.InstitutionId == card.InstitutionId)
             .OrderByDescending(e => e.ScheduledAt)
-            .Take(10);
+            .ToList();
 
         // Obtener la institución con su configuración
         var institution = await _context.Institutions
             .FirstOrDefaultAsync(i => i.Id == card.InstitutionId);
 
-        ViewBag.UpcomingEvents = upcoming;
-        ViewBag.HistoryEvents = history;
+        ViewBag.AllEvents = eventsList;
         ViewBag.Institution = institution;
 
         // Determinar qué mostrar según configuración

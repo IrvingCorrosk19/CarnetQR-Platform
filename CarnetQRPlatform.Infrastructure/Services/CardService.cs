@@ -4,7 +4,6 @@ using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace CarnetQRPlatform.Infrastructure.Services;
 
@@ -86,29 +85,9 @@ public class CardService : ICardService
 
         System.Console.WriteLine($"[Service] Institution found: {institution.Name}, Prefix: {institution.CardPrefix}");
 
-        // Generate card number
+        // Generate unique card number
         System.Console.WriteLine("[Service] Generating card number...");
-        var lastCard = await _context.Cards
-            .Where(c => c.InstitutionId == institutionId && c.CardNumber.StartsWith(institution.CardPrefix))
-            .OrderByDescending(c => c.CardNumber)
-            .FirstOrDefaultAsync();
-
-        int nextNumber = 1;
-        if (lastCard != null)
-        {
-            System.Console.WriteLine($"[Service] Last card found: {lastCard.CardNumber}");
-            var lastNumberStr = lastCard.CardNumber.Replace(institution.CardPrefix, "");
-            if (int.TryParse(lastNumberStr, out int lastNumber))
-            {
-                nextNumber = lastNumber + 1;
-            }
-        }
-        else
-        {
-            System.Console.WriteLine("[Service] No previous cards found, starting at 1");
-        }
-
-        var cardNumber = $"{institution.CardPrefix}{nextNumber:D6}";
+        var cardNumber = await GenerateUniqueCardNumberAsync(institutionId, institution.CardPrefix);
         System.Console.WriteLine($"[Service] Generated card number: {cardNumber}");
 
         // Generate secure QR token
@@ -132,7 +111,40 @@ public class CardService : ICardService
         System.Console.WriteLine("[Service] Saving to database...");
 
         _context.Cards.Add(card);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
+        {
+            // Unique constraint violation - probablemente race condition en generación de número de carnet
+            // o duplicado de QR token (muy poco probable)
+            if (pgEx.ConstraintName?.Contains("CardNumber") == true)
+            {
+                System.Console.WriteLine($"[Service] ERROR: CardNumber duplicate detected (race condition). Retrying...");
+                // Remover el card del contexto y crear uno nuevo con número único
+                _context.Entry(card).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                var retryCardNumber = await GenerateUniqueCardNumberAsync(institutionId, institution.CardPrefix);
+                card.CardNumber = retryCardNumber;
+                card.Id = Guid.NewGuid(); // Nuevo ID para evitar conflictos
+                _context.Cards.Add(card);
+                await _context.SaveChangesAsync();
+            }
+            else if (pgEx.ConstraintName?.Contains("QrToken") == true)
+            {
+                // QR Token duplicado (extremadamente poco probable, pero manejado)
+                System.Console.WriteLine($"[Service] ERROR: QrToken duplicate detected. Generating new token...");
+                _context.Entry(card).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                card.QrToken = GenerateSecureToken();
+                card.Id = Guid.NewGuid(); // Nuevo ID para evitar conflictos
+                _context.Cards.Add(card);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                throw;
+            }
+        }
 
         System.Console.WriteLine("[Service] Card saved successfully!");
         System.Console.WriteLine("=== [CardService] CreateAsync END ===");
@@ -162,12 +174,55 @@ public class CardService : ICardService
         return true;
     }
 
+    private async Task<string> GenerateUniqueCardNumberAsync(Guid institutionId, string prefix)
+    {
+        const int maxRetries = 10;
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            var lastCard = await _context.Cards
+                .Where(c => c.InstitutionId == institutionId && c.CardNumber.StartsWith(prefix))
+                .OrderByDescending(c => c.CardNumber)
+                .FirstOrDefaultAsync();
+
+            int nextNumber = 1;
+            if (lastCard != null)
+            {
+                var lastNumberStr = lastCard.CardNumber.Replace(prefix, "");
+                if (int.TryParse(lastNumberStr, out int lastNumber))
+                {
+                    nextNumber = lastNumber + 1;
+                }
+            }
+
+            var cardNumber = $"{prefix}{nextNumber:D6}";
+            
+            // Verificar que no existe (double-check para evitar race conditions)
+            var exists = await _context.Cards.AnyAsync(c => c.CardNumber == cardNumber);
+            if (!exists)
+            {
+                return cardNumber;
+            }
+            
+            // Si existe, esperar un poco y reintentar (en caso de race condition)
+            await Task.Delay(50 * (attempt + 1));
+        }
+        
+        throw new InvalidOperationException($"No se pudo generar un número de carnet único después de {maxRetries} intentos.");
+    }
+
     private string GenerateSecureToken()
     {
         using var rng = RandomNumberGenerator.Create();
         var bytes = new byte[32];
         rng.GetBytes(bytes);
-        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").Replace("=", "").Substring(0, 32);
+        
+        // Convert to Base64 URL-safe string and ensure exactly 32 characters
+        var base64 = Convert.ToBase64String(bytes);
+        var urlSafe = base64.Replace("+", "-").Replace("/", "_").Replace("=", "");
+        
+        // Ensure we have at least 32 characters (Base64 of 32 bytes = 44 chars, so this is safe)
+        // But take first 32 to ensure consistent length
+        return urlSafe.Length >= 32 ? urlSafe.Substring(0, 32) : urlSafe.PadRight(32, '0');
     }
 }
 

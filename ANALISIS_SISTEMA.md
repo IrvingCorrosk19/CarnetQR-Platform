@@ -300,6 +300,167 @@ Varios campos utilizan almacenamiento JSON:
 
 ---
 
+## 🎮 Controladores y Endpoints
+
+### Controladores Implementados
+
+#### 1. **AccountController**
+- **Responsabilidades:** Autenticación y gestión de sesión
+- **Endpoints:**
+  - `GET/POST /Account/Login` - Inicio de sesión
+  - `POST /Account/Logout` - Cerrar sesión
+  - `GET /Account/AccessDenied` - Acceso denegado
+  - `GET/POST /Account/ChangePassword` - Cambio de contraseña
+- **Autorización:** `[AllowAnonymous]` para Login, `[Authorize]` para otros
+- **Características:**
+  - Establece claim `InstitutionId` durante login
+  - Bloqueo de cuenta después de 5 intentos fallidos
+  - Registro de intentos de login en logs
+
+#### 2. **HomeController**
+- **Responsabilidades:** Dashboard principal
+- **Endpoints:**
+  - `GET /` - Página principal (Dashboard)
+  - `GET /Home/Privacy` - Política de privacidad
+  - `GET /Home/Error` - Página de error
+- **Autorización:** `[Authorize]` (requiere autenticación)
+
+#### 3. **InstitutionsController**
+- **Responsabilidades:** Gestión de instituciones
+- **Endpoints:**
+  - `GET /Institutions` - Lista de instituciones
+  - `GET /Institutions/Create` - Formulario de creación
+  - `POST /Institutions/Create` - Crear institución
+  - `GET /Institutions/Edit/{id}` - Formulario de edición
+  - `POST /Institutions/Edit/{id}` - Actualizar institución
+  - `GET /Institutions/Details/{id}` - Detalles de institución
+  - `POST /Institutions/Delete/{id}` - Eliminar institución
+- **Autorización:** `[Authorize(Policy = "SuperAdminOnly")]`
+- **Características:** Solo SuperAdmin puede gestionar instituciones
+
+#### 4. **EntityProfilesController**
+- **Responsabilidades:** Gestión de pacientes/beneficiarios
+- **Endpoints:**
+  - `GET /EntityProfiles` - Lista de pacientes
+  - `GET /EntityProfiles/Create` - Formulario de creación
+  - `POST /EntityProfiles/Create` - Crear paciente
+  - `GET /EntityProfiles/Edit/{id}` - Formulario de edición
+  - `POST /EntityProfiles/Edit/{id}` - Actualizar paciente
+  - `GET /EntityProfiles/Details/{id}` - Detalles de paciente
+  - `POST /EntityProfiles/Delete/{id}` - Eliminar paciente
+- **Autorización:** `[Authorize]` (Staff, Admin, SuperAdmin)
+- **Características:**
+  - Filtrado automático por tenant
+  - Gestión de campos personalizados
+  - Upload de fotos de pacientes
+
+#### 5. **CardsController**
+- **Responsabilidades:** Gestión de carnets
+- **Endpoints:**
+  - `GET /Cards` - Lista de carnets
+  - `POST /Cards/Create` - Crear carnet para un paciente
+  - `GET /Cards/Details/{id}` - Detalles de carnet
+  - `POST /Cards/ToggleActive/{id}` - Activar/desactivar carnet
+  - `POST /Cards/Delete/{id}` - Eliminar carnet
+  - `GET /Cards/Print/{id}` - Vista de impresión
+- **Autorización:** `[Authorize]` (Staff, Admin, SuperAdmin)
+- **Características:**
+  - Generación automática de número de carnet
+  - Generación de token QR único
+  - Validación estricta de tenant
+
+#### 6. **EventsController**
+- **Responsabilidades:** Gestión de citas médicas
+- **Endpoints:**
+  - `GET /Events` - Lista de citas
+  - `GET /Events/Create` - Formulario de creación
+  - `POST /Events/Create` - Crear cita
+  - `GET /Events/Edit/{id}` - Formulario de edición
+  - `POST /Events/Edit/{id}` - Actualizar cita
+  - `GET /Events/Details/{id}` - Detalles de cita
+  - `POST /Events/MarkCompleted/{id}` - Marcar como completada
+  - `POST /Events/MarkNotCompleted/{id}` - Marcar como no completada
+  - `POST /Events/Delete/{id}` - Eliminar cita
+- **Autorización:** `[Authorize]` (Staff, Admin, SuperAdmin)
+- **Características:**
+  - Validación de fechas (no se puede completar antes de la fecha programada)
+  - Registro de usuario que completó la cita
+  - Estados: Scheduled, Completed, NotCompleted
+
+#### 7. **QrController**
+- **Responsabilidades:** Visualización pública de información QR
+- **Endpoints:**
+  - `GET /q/{token}` - Visualizar información del carnet (público)
+- **Autorización:** `[AllowAnonymous]` (público, sin autenticación)
+- **Características:**
+  - Acceso sin autenticación
+  - Rate limiting aplicado (10 req/min)
+  - Respeta configuración de visibilidad de datos
+  - Muestra citas futuras e historial
+  - Genera código QR para mostrar en la vista
+
+#### 8. **UsersController**
+- **Responsabilidades:** Gestión de usuarios del sistema
+- **Endpoints:**
+  - `GET /Users` - Lista de usuarios
+  - `GET /Users/Create` - Formulario de creación
+  - `POST /Users/Create` - Crear usuario
+  - `GET /Users/Edit/{id}` - Formulario de edición
+  - `POST /Users/Edit/{id}` - Actualizar usuario
+  - `GET /Users/Details/{id}` - Detalles de usuario
+  - `POST /Users/ToggleActive/{id}` - Activar/desactivar usuario
+  - `POST /Users/Delete/{id}` - Eliminar usuario
+- **Autorización:** `[Authorize(Policy = "InstitutionAdminOrAbove")]`
+- **Características:**
+  - Solo InstitutionAdmin y SuperAdmin pueden gestionar usuarios
+  - Asignación de roles
+  - Vinculación con instituciones
+
+#### 9. **StatisticsController**
+- **Responsabilidades:** Estadísticas y reportes
+- **Endpoints:**
+  - `GET /Statistics` - Dashboard de estadísticas
+- **Autorización:** `[Authorize(Policy = "InstitutionAdminOrAbove")]`
+- **Características:**
+  - Estadísticas de citas (programadas, completadas, no completadas)
+  - Tasas de asistencia y completitud
+  - Tendencias por período (semana, mes, año)
+  - Estadísticas de carnets emitidos
+  - Estadísticas de pacientes
+
+#### 10. **InstitutionConfigController**
+- **Responsabilidades:** Configuración institucional
+- **Endpoints:**
+  - `GET /InstitutionConfig` - Configuración actual
+  - `POST /InstitutionConfig` - Actualizar configuración
+- **Autorización:** `[Authorize(Policy = "InstitutionAdminOrAbove")]`
+- **Características:**
+  - Configuración de visibilidad de datos
+  - Configuración de campos visibles en carnet
+  - Configuración de modo de visualización QR
+  - Upload de logo institucional
+
+#### 11. **CarnetController**
+- **Responsabilidades:** Visualización e impresión de carnets
+- **Endpoints:**
+  - `GET /Carnet/Print/{id}` - Vista de impresión de carnet
+- **Autorización:** `[Authorize]`
+- **Características:**
+  - Generación de vista imprimible
+  - Incluye código QR
+  - Respeta configuración institucional
+
+#### 12. **TestController** (Solo Desarrollo)
+- **Responsabilidades:** Endpoints de prueba
+- **Endpoints:**
+  - `GET /Test/CheckUsers` - Verificar usuarios creados
+- **Autorización:** `[AllowAnonymous]` (solo desarrollo)
+- **Características:**
+  - Muestra usuarios, roles e instituciones en JSON
+  - Útil para debugging
+
+---
+
 ## 🔧 Servicios y Lógica de Negocio
 
 ### Servicios Implementados
@@ -432,15 +593,430 @@ El sistema está listo para uso en producción, aunque se recomendarían mejoras
 
 ## 📌 Información Técnica Adicional
 
+### Stack Tecnológico
+
 - **Framework:** .NET 8.0
-- **ORM:** Entity Framework Core
-- **Base de Datos:** PostgreSQL
-- **Autenticación:** ASP.NET Core Identity
-- **Logging:** Serilog
+- **ORM:** Entity Framework Core 8.0.11
+- **Base de Datos:** PostgreSQL (Npgsql)
+- **Autenticación:** ASP.NET Core Identity 8.0.11
+- **Logging:** Serilog 10.0.0 (Console + File sinks)
+- **QR Code:** QRCoder 1.7.0
+- **Frontend:** 
+  - Bootstrap
+  - jQuery
+  - DataTables 2.3.6
+  - Font Awesome
 - **Patrón:** Repository/Service Pattern
 - **Arquitectura:** Clean Architecture / Layered Architecture
 
+### Dependencias Principales
+
+```xml
+- Microsoft.AspNetCore.Identity.EntityFrameworkCore (8.0.11)
+- Microsoft.EntityFrameworkCore.Design (8.0.11)
+- QRCoder (1.7.0)
+- Serilog.AspNetCore (10.0.0)
+- AspNetCore.HealthChecks.UI.Client (9.0.0)
+- datatables.net (2.3.6)
+```
+
+### Configuración de Base de Datos
+
+- **Proveedor:** Npgsql (PostgreSQL)
+- **Migraciones:** Entity Framework Core Migrations
+- **Configuración JSON:** 
+  - Campos complejos almacenados como JSON (VisibleFields, CustomFields, PatientDataVisibilityConfig, TemplateConfig, Metadata)
+  - Conversión automática mediante `JsonSerializer`
+  - ValueComparers personalizados para comparación de colecciones
+
+### Middleware Pipeline
+
+El orden del middleware en `Program.cs` es crítico para la seguridad:
+
+1. **Exception Handler** (solo producción)
+2. **HTTPS Redirection**
+3. **Static Files**
+4. **Serilog Request Logging**
+5. **Rate Limit Middleware** (temprano en el pipeline)
+6. **Routing**
+7. **Security Headers** (CSP, X-Frame-Options, etc.)
+8. **Authentication**
+9. **Tenant Middleware** (después de Authentication, antes de Authorization)
+10. **Authorization**
+11. **MVC Controllers**
+
+### Generación de Tokens QR
+
+- **Algoritmo:** `RandomNumberGenerator` (criptográficamente seguro)
+- **Longitud:** 32 caracteres
+- **Formato:** Base64 URL-safe (reemplaza `+`, `/`, `=` por `-`, `_`, y elimina padding)
+- **Unicidad:** Validado mediante índice único en base de datos
+- **Ejemplo:** `aBcD1234eFgH5678iJkL9012mNoP3456`
+
+### Rate Limiting
+
+- **Implementación:** Middleware personalizado con `ConcurrentDictionary` en memoria
+- **Límites:**
+  - Endpoints públicos (QR): 10 requests/minuto por IP
+  - Endpoints autenticados: 30 requests/minuto por IP
+  - Usuarios autenticados en endpoints no-QR: sin límite
+- **Ventana de tiempo:** 1 minuto (rolling window)
+- **Headers de respuesta:**
+  - `X-RateLimit-Limit`: Límite máximo
+  - `X-RateLimit-Remaining`: Solicitudes restantes
+  - `X-RateLimit-Reset`: Timestamp de reset
+  - `Retry-After`: Segundos hasta poder reintentar (cuando se excede)
+- **Limpieza:** Automática cada 30 segundos para entradas expiradas
+
+### Seguridad Multi-Tenant
+
+**Validaciones en múltiples capas:**
+
+1. **Capa de Servicio:**
+   - `ApplyTenantFilter()` extension method filtra automáticamente por `InstitutionId`
+   - Validación explícita en métodos de creación
+
+2. **Capa de Base de Datos:**
+   - `SaveChangesAsync()` valida que `InstitutionId` no cambie en updates
+   - Lanza `InvalidOperationException` si se detecta intento de cambio
+   - Restaura automáticamente el `InstitutionId` original
+
+3. **Capa de Middleware:**
+   - `TenantMiddleware` establece contexto de tenant en `HttpContext.Items`
+   - `TenantProvider` obtiene tenant desde claims del usuario
+
+4. **Capa de Controlador:**
+   - Políticas de autorización basadas en roles
+   - Validación de pertenencia a institución
+
+### Configuración de Logging
+
+- **Sinks:** Console + File (rolling daily)
+- **Retención:** 7 días
+- **Niveles:**
+  - Default: Information
+  - Microsoft: Warning
+  - System: Warning
+- **Ubicación:** `logs/log-{date}.txt`
+
+### Configuración de Cookies
+
+- **Expiración:** 8 horas
+- **Sliding Expiration:** Habilitado
+- **Lockout:** 
+  - 5 intentos fallidos
+  - Bloqueo por 15 minutos
+- **Rutas:**
+  - Login: `/Account/Login`
+  - Logout: `/Account/Logout`
+  - Access Denied: `/Account/AccessDenied`
+
+### Endpoints Públicos
+
+- **`GET /q/{token}`** - Visualización pública de información del carnet
+  - Sin autenticación requerida (`[AllowAnonymous]`)
+  - Rate limiting aplicado (10 req/min)
+  - Muestra información según configuración institucional
+  - Respeta `PatientDataVisibilityConfig` y `PatientDataVisibilityOverride`
+
+### Índices de Base de Datos
+
+**Índices únicos:**
+- `Institutions.CardPrefix` (único)
+- `Cards.CardNumber` (único)
+- `Cards.QrToken` (único)
+
+**Índices para performance:**
+- `EntityProfiles.InstitutionId`
+- `EntityProfiles.(InstitutionId, IdentificationNumber)`
+- `Cards.InstitutionId`
+- `Cards.EntityProfileId`
+- `EventRecords.InstitutionId`
+- `EventRecords.EntityProfileId`
+- `EventRecords.ScheduledAt`
+- `AuditLogs.InstitutionId`
+- `AuditLogs.Timestamp`
+- `AuditLogs.(Entity, EntityId)`
+
+### Extensiones de DbContext
+
+Métodos de extensión para filtrado multi-tenant:
+- `ApplyTenantFilter<T>()` - Filtro genérico para entidades `ITenantEntity`
+- `GetTenantEntityProfiles()` - EntityProfiles del tenant
+- `GetTenantCards()` - Cards del tenant
+- `GetTenantCardTemplates()` - Templates del tenant
+- `GetTenantEventRecords()` - EventRecords del tenant
+- `GetTenantAuditLogs()` - AuditLogs del tenant
+
 ---
 
-*Análisis generado: Diciembre 2024*
+## 🔍 Análisis Profundo de Componentes
+
+### Inicialización de Base de Datos (DbInitializer)
+
+**Proceso de inicialización:**
+1. **Migraciones:** Ejecuta automáticamente todas las migraciones pendientes
+2. **Roles:** Crea roles del sistema (SuperAdmin, InstitutionAdmin, Staff, AdministrativeOperator)
+3. **SuperAdmin:** Crea usuario SuperAdmin por defecto:
+   - Email: `admin@qlservices.com`
+   - Password: `Admin@123456`
+   - Sin institución asignada (`InstitutionId = null`)
+   - Sin bloqueo de cuenta
+4. **Demo Institution:** Crea institución de demostración:
+   - Nombre: "Empresa Demo"
+   - Prefijo: "DEMO"
+   - Tipo: Clínica
+   - Usuario admin: `admin@demo.com` / `Admin@123456`
+   - Rol: InstitutionAdmin
+
+**Características:**
+- Validación de existencia antes de crear
+- Logging detallado de cada operación
+- Manejo de errores con re-throw para debugging
+- No sobrescribe usuarios existentes
+
+### Flujo de Autenticación
+
+**Proceso de Login:**
+1. Validación de ModelState (email, password)
+2. Búsqueda de usuario por email
+3. Validación de usuario activo
+4. Intentos de login con bloqueo (5 intentos = 15 min bloqueo)
+5. **Establecimiento de Claims:**
+   - Si usuario tiene `InstitutionId`, se agrega claim `InstitutionId`
+   - Claim se actualiza si cambió la institución
+   - `RefreshSignInAsync` para incluir claim en sesión actual
+6. Actualización de `LastLoginAt`
+7. Redirección según rol (todos van a Home/Index)
+
+**Estados de Login:**
+- `Succeeded`: Login exitoso
+- `IsLockedOut`: Cuenta bloqueada (página Lockout)
+- `RequiresTwoFactor`: Requiere 2FA (no implementado)
+- `IsNotAllowed`: Cuenta no permitida (email no confirmado)
+- `Failed`: Credenciales inválidas
+
+### Validaciones de Negocio
+
+#### EntityProfile (Pacientes)
+- **Creación:**
+  - Validación de tenant context (excepto SuperAdmin)
+  - SuperAdmin debe proporcionar `InstitutionId` explícitamente
+  - Conversión de `DateOfBirth` a UTC (requisito PostgreSQL)
+  - `InstitutionId` se fuerza desde tenant (no se acepta del request)
+  
+- **Actualización:**
+  - Validación de existencia con filtro tenant
+  - `InstitutionId` no puede cambiar (validación adicional)
+  - Solo se actualizan campos permitidos
+  - `DateOfBirth` se convierte a UTC
+  
+- **Eliminación:**
+  - Validación de no tener Cards asociados
+  - Validación de no tener EventRecords asociados
+  - Mensajes de error descriptivos
+
+#### Card (Carnets)
+- **Creación:**
+  - Validación de tenant context
+  - Validación de EntityProfile pertenece al tenant
+  - Generación de número único: `{Prefix}{6 dígitos consecutivos}` (ej: "DEMO000001")
+  - Generación de QR Token seguro (32 caracteres, Base64 URL-safe)
+  - Validación de unicidad de `CardNumber` (por institución)
+  - Validación de unicidad global de `QrToken`
+  
+- **Activación/Desactivación:**
+  - Toggle de `IsActive`
+  - Auditoría de cambios
+  - Registro de acción con metadata
+
+#### EventRecord (Citas)
+- **Creación:**
+  - Validación de tenant context
+  - Validación de EntityProfile pertenece al tenant
+  - Estado inicial: `Scheduled`
+  - Conversión de `ScheduledAt` a UTC
+  
+- **Cambio de Estado:**
+  - No se puede completar antes de `ScheduledAt`
+  - Validación: `ScheduledAt > DateTime.UtcNow` → error
+  - Actualización de `CompletedAt` cuando cambia estado
+  - Estados posibles: `Scheduled`, `Completed`, `NotCompleted`
+  
+- **Consultas:**
+  - `GetUpcomingAsync`: Citas futuras con estado `Scheduled`
+  - `GetByEntityProfileAsync`: Todas las citas de un paciente (filtrado por tenant)
+
+#### Institution (Institución)
+- **Creación:**
+  - Validación de unicidad de `CardPrefix` (índice único)
+  - Manejo de excepción `DbUpdateException` con código PostgreSQL 23505 (unique violation)
+  - Mensajes de error descriptivos
+  
+- **Validaciones:**
+  - `CardPrefix`: Máximo 10 caracteres, único globalmente
+  - `Name`: Máximo 200 caracteres, requerido
+  - Índice en `Name` para búsquedas rápidas
+
+#### CardTemplate (Plantillas)
+- **Creación:**
+  - Máximo 6 campos visibles (`VisibleFields.Count <= 6`)
+  - Si es primera plantilla o `IsDefault = true`, se marca como default
+  - Si se marca como default, desmarca otros templates del tenant
+  
+- **Actualización:**
+  - Validación de máximo 6 campos visibles
+  - Lógica compleja para manejo de template default:
+    - Si se marca como default → desmarca otros
+    - Si se desmarca y es el único → no permite desmarcar
+    - Si se desmarca y hay otros → marca el primero como default
+  
+- **Eliminación:**
+  - No permite eliminar si es el único template
+  - Si era default, marca otro como default automáticamente
+
+### Servicio de Código QR (QrCodeService)
+
+**Funcionalidades:**
+- `GenerateQrCodeBase64(string url, int size)`: Generación básica
+- `GenerateQrCodeBase64(string url, int size, string darkColor, string lightColor)`: Con colores personalizados
+
+**Características técnicas:**
+- **Biblioteca:** QRCoder 1.7.0
+- **Nivel de corrección de errores:** ECCLevel.Q (25% de errores recuperables)
+- **Formato de salida:** Base64 PNG (`data:image/png;base64,...`)
+- **Cálculo de tamaño:** Ajuste automático de `pixelsPerModule` basado en tamaño deseado
+- **Conversión de colores:** Hex a RGB para personalización
+
+**Uso en el sistema:**
+- Generación de QR para visualización pública (`/q/{token}`)
+- QR en detalles de carnet
+- QR en vista de impresión
+
+### Auditoría (AuditService)
+
+**Registro de acciones:**
+- **Campos:** InstitutionId, UserId, Action, Entity, EntityId, Timestamp, Metadata
+- **Acciones típicas:** CREATE, UPDATE, DELETE, TOGGLE_ACTIVE
+- **Entidades rastreadas:** Card, EntityProfile, EventRecord, AppUser, Institution
+- **Metadata:** Diccionario JSON con información adicional (ej: CardNumber, OldStatus, NewStatus)
+
+**Ejemplos de auditoría:**
+- Creación de usuario: `{ "Email": "...", "Role": "..." }`
+- Toggle de carnet: `{ "CardNumber": "...", "IsActive": true }`
+- Toggle de usuario: `{ "Email": "...", "OldStatus": true, "NewStatus": false }`
+
+### Gestión de Usuarios
+
+**Creación de Usuario:**
+1. Validación de permisos según rol:
+   - InstitutionAdmin: Solo puede crear Staff y AdministrativeOperator
+   - SuperAdmin: Puede crear todos los roles excepto SuperAdmin (a través de código)
+2. Validación de institución:
+   - InstitutionAdmin: Fuerza su propia institución
+   - SuperAdmin: Debe seleccionar (excepto si crea otro SuperAdmin)
+   - SuperAdmin no puede tener institución asignada
+3. Validación de email único
+4. Creación con `EmailConfirmed = true` (no requiere confirmación)
+5. Asignación de rol
+6. Agregar claim `InstitutionId` si tiene institución
+7. Auditoría de creación
+
+**Protecciones:**
+- No se puede desactivar el propio usuario
+- Validación de rol permitido según permisos
+- Validación de institución existente y activa
+
+### Flujo Multi-Tenant Completo
+
+**Nivel 1: Claims (AccountController)**
+- Durante login, se establece claim `InstitutionId`
+- Claim se guarda en Identity
+- Claim se incluye en cookie de autenticación
+
+**Nivel 2: Middleware (TenantMiddleware)**
+- Se ejecuta después de Authentication, antes de Authorization
+- Obtiene `InstitutionId` del claim
+- Lo establece en `HttpContext.Items["TenantId"]`
+- SuperAdmin no tiene tenant (null)
+
+**Nivel 3: TenantProvider (Servicios)**
+- Obtiene `InstitutionId` desde claims o `HttpContext.Items`
+- Retorna `null` para SuperAdmin
+- Usado por todos los servicios para filtrado
+
+**Nivel 4: Servicios**
+- Usan `ApplyTenantFilter()` extension method
+- Filtran automáticamente por `InstitutionId`
+- SuperAdmin ve todos los registros
+
+**Nivel 5: DbContext (SaveChangesAsync)**
+- Validación final: No permite cambiar `InstitutionId` en updates
+- Restaura `InstitutionId` original si se intenta cambiar
+- Lanza excepción si detecta violación multi-tenant
+
+**Nivel 6: Base de Datos**
+- Índices en `InstitutionId` para performance
+- Foreign keys con `DeleteBehavior.Restrict`
+- Constraints de unicidad
+
+### Configuración de Visibilidad de Datos
+
+**Niveles de configuración:**
+1. **Global (Institution):** `PatientDataVisibilityConfig` (Dictionary<string, bool>)
+2. **Por Paciente (EntityProfile):** `PatientDataVisibilityOverride` (Dictionary<string, bool>?)
+   - Sobrescribe configuración global si existe
+   - Null si no hay override
+
+**Lógica de aplicación:**
+- Primero se consulta `PatientDataVisibilityOverride`
+- Si existe, se usa ese
+- Si no existe, se usa `PatientDataVisibilityConfig` global
+- Si tampoco existe, valores por defecto
+
+**Campos configurables:**
+- Nombre completo
+- Identificación
+- Email
+- Teléfono
+- Fecha de nacimiento
+- Foto
+- Campos personalizados (`CustomFields`)
+
+### Generación de Números de Carnet
+
+**Algoritmo:**
+1. Obtener última tarjeta con prefijo de institución
+2. Extraer número consecutivo del `CardNumber`
+3. Incrementar en 1
+4. Formatear con padding de 6 dígitos: `{Prefix}{Number:D6}`
+
+**Ejemplo:**
+- Último: "DEMO000045"
+- Próximo: "DEMO000046"
+- Si no existe: "DEMO000001"
+
+**Características:**
+- Formato fijo: Prefijo + 6 dígitos
+- Búsqueda optimizada con `OrderByDescending`
+- Manejo de prefijos variables (máx 10 caracteres)
+
+### Migraciones de Base de Datos
+
+**Migraciones existentes:**
+1. **InitialCreate (20251227012057):** Creación inicial del esquema
+2. **AllowNullInstitutionId (20251227015651):** Permite `InstitutionId` null en AppUser (para SuperAdmin)
+3. **AddInstitutionConfigurationFields (20251227193023):** Agrega campos de configuración a Institution
+
+**Características de migraciones:**
+- Conversión automática de enums a int
+- Configuración de campos JSON con serialización/deserialización
+- ValueComparers personalizados para comparación de colecciones
+- Índices únicos y compuestos
+- Foreign keys con `OnDelete(DeleteBehavior.Restrict)`
+
+---
+
+*Análisis generado: Diciembre 2024*  
+*Última actualización completa: Enero 2025*
 
