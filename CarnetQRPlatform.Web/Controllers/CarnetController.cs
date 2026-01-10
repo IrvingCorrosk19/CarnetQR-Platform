@@ -68,26 +68,35 @@ public class CarnetController : Controller
             template = await _cardTemplateService.GetDefaultTemplateAsync();
         }
 
-        // Crear configuración inicial
+        // Verificar si hay foto disponible
+        var hasPhoto = !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath);
+        
+        // Crear configuración inicial con valores por defecto
         var config = new PrintCardConfig();
         
-        // Aplicar configuraciones desde template si existe
+        // CONFIGURACIÓN POR DEFECTO PRIORITARIA: foto en frente, QR en trasera (si hay foto)
+        // Esta se aplica primero para que tenga prioridad sobre el template
+        if (hasPhoto)
+        {
+            config.ShowPhoto = true;
+            config.DoubleSided = true;
+            config.QrOnBack = true;
+            config.ShowQrCode = false; // No mostrar QR en el frente (va en la trasera)
+        }
+        
+        // Aplicar configuraciones desde template si existe (puede sobrescribir algunas, pero respetamos la prioridad de foto/QR)
         if (template != null && template.TemplateConfig != null && template.TemplateConfig.Count > 0)
         {
             ApplyTemplateConfig(config, template.TemplateConfig);
-        }
-
-        // Aplicar configuraciones de institución como fallback
-        // Mostrar foto si existe (independientemente de PhotoEnabled de la institución)
-        config.ShowPhoto = !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath);
-        
-        // Configuración por defecto: foto en el frente, QR en la trasera
-        if (config.ShowPhoto)
-        {
-            // Por defecto: carnet de dos caras con foto en frente y QR en trasera
-            config.DoubleSided = true;
-            config.QrOnBack = true;
-            config.ShowQrCode = false; // No mostrar QR en el frente si está en la trasera
+            
+            // Si hay foto, forzar que se muestre y el QR vaya en la trasera (prioridad sobre template)
+            if (hasPhoto)
+            {
+                config.ShowPhoto = true;
+                config.DoubleSided = true;
+                config.QrOnBack = true;
+                config.ShowQrCode = false;
+            }
         }
         
         if (card.Institution != null)
@@ -122,20 +131,37 @@ public class CarnetController : Controller
             Config = config
         };
 
-        // Permitir override vía query string (sobrescribe configuraciones de template)
+        // Permitir override vía query string (sobrescribe configuraciones de template y por defecto)
         ApplyQueryStringOverrides(viewModel.Config);
         
-        // Asegurar coherencia: si QrOnBack está activo, el QR no debe mostrarse en el frente
+        // VERIFICACIÓN FINAL Y ASEGURAR COHERENCIA:
+        // Si hay foto, priorizar configuración: foto en frente, QR en trasera
+        if (!string.IsNullOrEmpty(viewModel.PhotoPath))
+        {
+            viewModel.Config.ShowPhoto = true;
+            
+            // Asegurar que si hay foto, por defecto el QR vaya en la trasera
+            // (solo si no se especificó explícitamente via query string que no debe estar en la trasera)
+            if (!Request.Query.ContainsKey("qrOnBack") && !Request.Query.ContainsKey("doubleSided"))
+            {
+                viewModel.Config.DoubleSided = true;
+                viewModel.Config.QrOnBack = true;
+                viewModel.Config.ShowQrCode = false; // No mostrar QR en el frente
+            }
+        }
+        
+        // Asegurar coherencia general: si QrOnBack está activo, el QR no debe mostrarse en el frente
         if (viewModel.Config.QrOnBack)
         {
             viewModel.Config.DoubleSided = true;
             viewModel.Config.ShowQrCode = false;
         }
         
-        // Si hay foto disponible, asegurar que se muestre
-        if (!string.IsNullOrEmpty(viewModel.PhotoPath))
+        // Si DoubleSided está activo pero QrOnBack no está explícitamente desactivado, activarlo por defecto
+        if (viewModel.Config.DoubleSided && !Request.Query.ContainsKey("qrOnBack") && !string.IsNullOrEmpty(viewModel.PhotoPath))
         {
-            viewModel.Config.ShowPhoto = true;
+            viewModel.Config.QrOnBack = true;
+            viewModel.Config.ShowQrCode = false;
         }
 
         return View("PrintCarnet", viewModel);
