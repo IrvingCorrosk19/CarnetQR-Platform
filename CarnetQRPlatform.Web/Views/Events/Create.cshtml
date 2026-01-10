@@ -1,6 +1,10 @@
 @model CarnetQRPlatform.Domain.Entities.EventRecord
+@using CarnetQRPlatform.Domain.Constants
 @{
     ViewData["Title"] = "Nuevo Evento";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+    var entityProfiles = ViewBag.EntityProfiles as IEnumerable<CarnetQRPlatform.Domain.Entities.EntityProfile>;
 }
 
 <div class="card fade-in">
@@ -15,8 +19,24 @@
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
             
+            @* Selector de institución solo para SuperAdmin *@
+            @if (isSuperAdmin && institutions != null && institutions.Any())
+            {
+                <div class="form-group mb-4">
+                    <label for="InstitutionFilter" class="form-label">Empresa</label>
+                    <select id="InstitutionFilter" class="form-select">
+                        <option value="">-- Todas las empresas --</option>
+                        @foreach (var institution in institutions)
+                        {
+                            <option value="@institution.Id">@institution.Name</option>
+                        }
+                    </select>
+                    <small class="form-text text-muted">Seleccione una empresa para filtrar las entidades.</small>
+                </div>
+            }
+
             <div class="form-group mb-4">
-                <label class="form-label">Entidad</label>
+                <label asp-for="EntityProfileId" class="form-label">Entidad <span class="text-danger">*</span></label>
                 @if (Model.EntityProfileId != Guid.Empty)
                 {
                     <input type="hidden" asp-for="EntityProfileId" />
@@ -24,11 +44,23 @@
                 }
                 else
                 {
-                    <select asp-for="EntityProfileId" class="form-select" required>
+                    <select asp-for="EntityProfileId" class="form-select" id="EntityProfileId" required>
                         <option value="">-- Seleccione una entidad --</option>
-                        @* Las opciones se cargarán dinámicamente o se pasarán por ViewBag *@
+                        @if (entityProfiles != null)
+                        {
+                            @foreach (var entity in entityProfiles)
+                            {
+                                <option value="@entity.Id" data-institution-id="@entity.InstitutionId">
+                                    @($"{entity.FirstName} {entity.LastName}")@(!string.IsNullOrEmpty(entity.IdentificationNumber) ? $" - {entity.IdentificationNumber}" : "")
+                                </option>
+                            }
+                        }
                     </select>
                     <span asp-validation-for="EntityProfileId" class="text-danger"></span>
+                    @if (entityProfiles == null || !entityProfiles.Any())
+                    {
+                        <small class="form-text text-warning">No hay entidades disponibles. Debe crear entidades primero.</small>
+                    }
                 }
             </div>
 
@@ -60,6 +92,44 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
         $(document).ready(function() {
+            @if (isSuperAdmin)
+            {
+                <text>
+                // Filtrar entidades por institución para SuperAdmin
+                $('#InstitutionFilter').on('change', function() {
+                    var selectedInstitutionId = $(this).val();
+                    var $entitySelect = $('#EntityProfileId');
+                    var currentValue = $entitySelect.val();
+                    
+                    if (selectedInstitutionId) {
+                        // Filtrar opciones por institución
+                        $entitySelect.find('option').each(function() {
+                            var $option = $(this);
+                            var institutionId = $option.data('institution-id');
+                            
+                            if ($option.val() === '') {
+                                // Mantener la opción por defecto
+                                $option.show();
+                            } else if (institutionId === selectedInstitutionId) {
+                                $option.show();
+                            } else {
+                                $option.hide();
+                            }
+                        });
+                    } else {
+                        // Mostrar todas las opciones
+                        $entitySelect.find('option').show();
+                    }
+                    
+                    // Si la entidad seleccionada no coincide con el filtro, limpiar selección
+                    var selectedOption = $entitySelect.find('option:selected');
+                    if (selectedInstitutionId && selectedOption.data('institution-id') !== selectedInstitutionId) {
+                        $entitySelect.val('');
+                    }
+                });
+                </text>
+            }
+            
             $('#createEventForm').on('submit', function(e) {
                 e.preventDefault();
                 submitFormAjax(this, {

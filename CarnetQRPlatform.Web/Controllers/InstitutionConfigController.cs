@@ -11,13 +11,14 @@ using System.IO;
 
 namespace CarnetQRPlatform.Web.Controllers;
 
-[Authorize(Policy = "InstitutionAdminOrAbove")]
+[Authorize(Roles = Roles.InstitutionAdmin)]
 public class InstitutionConfigController : Controller
 {
     private readonly IInstitutionService _institutionService;
     private readonly ITenantProvider _tenantProvider;
     private readonly IAuditService _auditService;
     private readonly UserManager<AppUser> _userManager;
+    private readonly SignInManager<AppUser> _signInManager;
     private readonly ILogger<InstitutionConfigController> _logger;
 
     public InstitutionConfigController(
@@ -25,24 +26,54 @@ public class InstitutionConfigController : Controller
         ITenantProvider tenantProvider,
         IAuditService auditService,
         UserManager<AppUser> userManager,
+        SignInManager<AppUser> signInManager,
         ILogger<InstitutionConfigController> logger)
     {
         _institutionService = institutionService;
         _tenantProvider = tenantProvider;
         _auditService = auditService;
         _userManager = userManager;
+        _signInManager = signInManager;
         _logger = logger;
     }
 
     public async Task<IActionResult> Index()
     {
-        var institution = await GetCurrentInstitutionAsync();
-        if (institution == null)
+        try
         {
-            return NotFound();
-        }
+            var institution = await GetCurrentInstitutionAsync();
+            if (institution == null)
+            {
+                _logger.LogWarning("InstitutionConfig/Index: Institution not found. User: {UserId}, IsSuperAdmin: {IsSuperAdmin}", 
+                    _userManager.GetUserId(User), _tenantProvider.IsSuperAdmin());
+                
+                // Si es SuperAdmin, redirigir con mensaje
+                if (_tenantProvider.IsSuperAdmin())
+                {
+                    TempData["ErrorMessage"] = "Los SuperAdmin no pueden acceder a la configuración de institución. Use el módulo de Instituciones para gestionar instituciones.";
+                    return RedirectToAction("Index", "Home");
+                }
+                
+                // Si no tiene InstitutionId, mostrar mensaje más claro
+                var user = await _userManager.GetUserAsync(User);
+                if (user == null || !user.InstitutionId.HasValue)
+                {
+                    TempData["ErrorMessage"] = "Su cuenta de usuario no está asociada a ninguna institución. Contacte al administrador del sistema.";
+                    return RedirectToAction("Index", "Home");
+                }
+                
+                TempData["ErrorMessage"] = "No se pudo encontrar la información de su institución. Contacte al administrador del sistema.";
+                return RedirectToAction("Index", "Home");
+            }
 
-        return View(institution);
+            return View(institution);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in InstitutionConfig/Index");
+            TempData["ErrorMessage"] = "Ocurrió un error al cargar la configuración de la institución.";
+            return RedirectToAction("Index", "Home");
+        }
     }
 
     [HttpGet]
@@ -422,13 +453,86 @@ public class InstitutionConfigController : Controller
 
     private async Task<Institution?> GetCurrentInstitutionAsync()
     {
-        var tenantId = _tenantProvider.GetCurrentTenantId();
-        if (!tenantId.HasValue)
+        try
         {
+            var userId = _userManager.GetUserId(User);
+            _logger.LogInformation("GetCurrentInstitutionAsync called. UserId: {UserId}", userId);
+
+            // Si es SuperAdmin, no puede acceder a esta configuración (solo para InstitutionAdmin)
+            if (_tenantProvider.IsSuperAdmin())
+            {
+                _logger.LogWarning("SuperAdmin attempted to access InstitutionConfig. User: {UserId}", userId);
+                return null;
+            }
+
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            _logger.LogInformation("TenantId from provider: {TenantId}", tenantId);
+            
+            // Si no hay tenantId en los claims, intentar obtenerlo directamente del usuario
+            if (!tenantId.HasValue)
+            {
+                _logger.LogInformation("No tenantId in claims, trying to get from user entity...");
+                var user = await _userManager.GetUserAsync(User);
+                if (user != null)
+                {
+                    _logger.LogInformation("User found. InstitutionId in entity: {InstitutionId}", user.InstitutionId);
+                    
+                    if (user.InstitutionId.HasValue)
+                    {
+                        tenantId = user.InstitutionId.Value;
+                        
+                        // Agregar el claim si no existe
+                        var existingClaims = await _userManager.GetClaimsAsync(user);
+                        var institutionClaim = existingClaims.FirstOrDefault(c => c.Type == "InstitutionId");
+                        if (institutionClaim == null)
+                        {
+                            _logger.LogInformation("Adding InstitutionId claim to user. InstitutionId: {InstitutionId}", tenantId.Value);
+                            await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("InstitutionId", tenantId.Value.ToString()));
+                            // Refrescar el sign-in para incluir el claim en la sesión actual
+                            await _signInManager.RefreshSignInAsync(user);
+                            _logger.LogInformation("Claim added and sign-in refreshed");
+                        }
+                        else
+                        {
+                            _logger.LogInformation("InstitutionId claim already exists: {ClaimValue}", institutionClaim.Value);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("User {UserId} does not have InstitutionId in entity", userId);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("User {UserId} not found in UserManager", userId);
+                }
+            }
+
+            if (!tenantId.HasValue)
+            {
+                _logger.LogWarning("User {UserId} does not have an InstitutionId. Cannot access InstitutionConfig.", userId);
+                return null;
+            }
+
+            _logger.LogInformation("Fetching institution with Id: {InstitutionId}", tenantId.Value);
+            var institution = await _institutionService.GetByIdAsync(tenantId.Value);
+            
+            if (institution == null)
+            {
+                _logger.LogWarning("Institution with Id {InstitutionId} not found", tenantId.Value);
+            }
+            else
+            {
+                _logger.LogInformation("Institution found: {InstitutionName}", institution.Name);
+            }
+
+            return institution;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetCurrentInstitutionAsync");
             return null;
         }
-
-        return await _institutionService.GetByIdAsync(tenantId.Value);
     }
 }
 

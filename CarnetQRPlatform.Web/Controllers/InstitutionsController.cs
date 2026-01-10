@@ -88,19 +88,60 @@ public class InstitutionsController : Controller
             
             if (createUserResult.Succeeded)
             {
-                await _userManager.AddToRoleAsync(adminUser, Roles.InstitutionAdmin);
+                _logger.LogInformation("User created successfully: {Email}, UserName: {UserName}", 
+                    adminUser.Email, adminUser.UserName);
+                
+                var roleResult = await _userManager.AddToRoleAsync(adminUser, Roles.InstitutionAdmin);
+                if (roleResult.Succeeded)
+                {
+                    _logger.LogInformation("Role InstitutionAdmin assigned to user: {Email}", model.AdminEmail);
+                }
+                else
+                {
+                    _logger.LogError("Error assigning role to user {Email}: {Errors}", 
+                        model.AdminEmail, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                }
                 
                 // Agregar claim de InstitutionId
-                await _userManager.AddClaimAsync(adminUser, new Claim("InstitutionId", createdInstitution.Id.ToString()));
+                var claimResult = await _userManager.AddClaimAsync(adminUser, new Claim("InstitutionId", createdInstitution.Id.ToString()));
+                if (claimResult.Succeeded)
+                {
+                    _logger.LogInformation("InstitutionId claim added to user: {Email}, InstitutionId: {InstitutionId}", 
+                        model.AdminEmail, createdInstitution.Id);
+                }
+                else
+                {
+                    _logger.LogError("Error adding claim to user {Email}: {Errors}", 
+                        model.AdminEmail, string.Join(", ", claimResult.Errors.Select(e => e.Description)));
+                }
                 
-                _logger.LogInformation("InstitutionAdmin created for institution {InstitutionName}: {Email}", 
+                _logger.LogInformation("InstitutionAdmin created successfully for institution {InstitutionName}: {Email}", 
                     createdInstitution.Name, model.AdminEmail);
             }
             else
             {
-                _logger.LogError("Error creating InstitutionAdmin: {Errors}", 
-                    string.Join(", ", createUserResult.Errors.Select(e => e.Description)));
+                var errors = string.Join("; ", createUserResult.Errors.Select(e => $"{e.Code}: {e.Description}"));
+                _logger.LogError("Error creating InstitutionAdmin for {Email}: {Errors}", 
+                    model.AdminEmail, errors);
+                
+                // Si es petición AJAX, retornar error detallado
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { 
+                        success = false, 
+                        message = $"Error al crear el usuario administrador: {errors}" 
+                    });
+                }
+                
+                // Agregar errores al ModelState para mostrarlos en la vista
+                foreach (var error in createUserResult.Errors)
+                {
+                    ModelState.AddModelError("AdminPassword", $"{error.Code}: {error.Description}");
+                }
+                
                 // Continuar aunque falle la creación del admin (se puede crear manualmente después)
+                // Pero informar al usuario
+                TempData["WarningMessage"] = $"La institución se creó, pero hubo un problema al crear el usuario administrador: {errors}";
             }
 
             // Registrar auditoría
@@ -121,17 +162,42 @@ public class InstitutionsController : Controller
             TempData["SuccessMessage"] = "Empresa y administrador creados exitosamente.";
             return RedirectToAction(nameof(Index));
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex) when (ex.Message.Contains("prefijo de carnet") || ex.Message.Contains("CardPrefix"))
         {
-            _logger.LogError(ex, "Error creating institution");
-            var errorMsg = "Error al crear la empresa.";
+            _logger.LogWarning(ex, "CardPrefix duplicate error: {Message}", ex.Message);
+            var errorMsg = ex.Message;
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
                 return Json(new { success = false, message = errorMsg });
             }
             
-            ModelState.AddModelError("", errorMsg);
+            ModelState.AddModelError(nameof(model.CardPrefix), errorMsg);
+            return View(model);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating institution");
+            var errorMsg = "Error al crear la empresa.";
+            
+            // Si el error es de CardPrefix duplicado, mostrar mensaje más específico
+            if (ex.InnerException is Npgsql.PostgresException pgEx && 
+                pgEx.SqlState == "23505" && 
+                pgEx.ConstraintName == "IX_Institutions_CardPrefix")
+            {
+                errorMsg = $"El prefijo de carnet '{model.CardPrefix}' ya está en uso. Por favor, elija otro prefijo.";
+                ModelState.AddModelError(nameof(model.CardPrefix), errorMsg);
+            }
+            else
+            {
+                ModelState.AddModelError("", errorMsg);
+            }
+            
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+            
             return View(model);
         }
     }

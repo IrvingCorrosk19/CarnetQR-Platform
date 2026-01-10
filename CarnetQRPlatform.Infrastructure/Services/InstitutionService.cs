@@ -3,6 +3,7 @@ using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CarnetQRPlatform.Infrastructure.Services;
 
@@ -31,10 +32,47 @@ public class InstitutionService : IInstitutionService
 
     public async Task<Institution> CreateAsync(Institution institution)
     {
+        // Verificar si el CardPrefix ya existe
+        var existingInstitution = await _context.Institutions
+            .FirstOrDefaultAsync(i => i.CardPrefix == institution.CardPrefix);
+        
+        if (existingInstitution != null)
+        {
+            throw new InvalidOperationException(
+                $"El prefijo de carnet '{institution.CardPrefix}' ya está en uso por la institución '{existingInstitution.Name}'. Por favor, elija otro prefijo.");
+        }
+        
         institution.Id = Guid.NewGuid();
         institution.CreatedAt = DateTime.UtcNow;
         _context.Institutions.Add(institution);
-        await _context.SaveChangesAsync();
+        
+        try
+        {
+            await _context.SaveChangesAsync();
+            
+            // Inicializar templates predefinidos para la nueva institución
+            try
+            {
+                var templateInitializer = new CardTemplateInitializer(_context);
+                await templateInitializer.InitializeDefaultTemplatesAsync(institution.Id);
+            }
+            catch (Exception ex)
+            {
+                // Log error pero no fallar la creación de la institución
+                // Los templates pueden crearse manualmente después
+                System.Diagnostics.Debug.WriteLine($"Warning: No se pudieron inicializar templates para la institución {institution.Name}: {ex.Message}");
+            }
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
+        {
+            if (pgEx.ConstraintName == "IX_Institutions_CardPrefix")
+            {
+                throw new InvalidOperationException(
+                    $"El prefijo de carnet '{institution.CardPrefix}' ya está en uso. Por favor, elija otro prefijo.", ex);
+            }
+            throw;
+        }
+        
         return institution;
     }
 

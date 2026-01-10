@@ -49,12 +49,25 @@ public class AccountController : Controller
             return View(model);
         }
 
+        _logger.LogInformation("Login attempt for email: {Email}", model.Email);
+        
         var user = await _userManager.FindByEmailAsync(model.Email);
-        if (user == null || !user.IsActive)
+        if (user == null)
         {
+            _logger.LogWarning("Login failed: User not found for email: {Email}", model.Email);
             ModelState.AddModelError(string.Empty, "Credenciales inválidas.");
             return View(model);
         }
+        
+        if (!user.IsActive)
+        {
+            _logger.LogWarning("Login failed: User {Email} is not active", model.Email);
+            ModelState.AddModelError(string.Empty, "Su cuenta está desactivada. Contacte al administrador.");
+            return View(model);
+        }
+        
+        _logger.LogInformation("User found: {Email}, UserName: {UserName}, InstitutionId: {InstitutionId}, IsActive: {IsActive}", 
+            user.Email, user.UserName, user.InstitutionId, user.IsActive);
 
         var result = await _signInManager.PasswordSignInAsync(
             user.UserName!,
@@ -64,6 +77,8 @@ public class AccountController : Controller
 
         if (result.Succeeded)
         {
+            _logger.LogInformation("Login successful for user: {Email}", model.Email);
+            
             // Add InstitutionId claim if not already present and user has an institution
             if (user.InstitutionId.HasValue)
             {
@@ -73,6 +88,15 @@ public class AccountController : Controller
                 if (institutionClaim == null)
                 {
                     await _userManager.AddClaimAsync(user, new Claim("InstitutionId", user.InstitutionId.Value.ToString()));
+                    // Refresh sign-in to include the new claim in the current session
+                    await _signInManager.RefreshSignInAsync(user);
+                }
+                else if (institutionClaim.Value != user.InstitutionId.Value.ToString())
+                {
+                    // Update claim if InstitutionId changed
+                    await _userManager.RemoveClaimAsync(user, institutionClaim);
+                    await _userManager.AddClaimAsync(user, new Claim("InstitutionId", user.InstitutionId.Value.ToString()));
+                    await _signInManager.RefreshSignInAsync(user);
                 }
             }
 
@@ -110,8 +134,25 @@ public class AccountController : Controller
             _logger.LogWarning("User account {Email} locked out.", model.Email);
             return View("Lockout");
         }
+        
+        if (result.RequiresTwoFactor)
+        {
+            _logger.LogWarning("User account {Email} requires two-factor authentication.", model.Email);
+            ModelState.AddModelError(string.Empty, "Se requiere autenticación de dos factores.");
+            return View(model);
+        }
+        
+        if (result.IsNotAllowed)
+        {
+            _logger.LogWarning("User account {Email} is not allowed to sign in.", model.Email);
+            ModelState.AddModelError(string.Empty, "No se permite el inicio de sesión para esta cuenta. Verifique su correo electrónico.");
+            return View(model);
+        }
 
-        ModelState.AddModelError(string.Empty, "Credenciales inválidas.");
+        _logger.LogWarning("Login failed for user {Email}. Succeeded: {Succeeded}, IsLockedOut: {IsLockedOut}, RequiresTwoFactor: {RequiresTwoFactor}, IsNotAllowed: {IsNotAllowed}", 
+            model.Email, result.Succeeded, result.IsLockedOut, result.RequiresTwoFactor, result.IsNotAllowed);
+        
+        ModelState.AddModelError(string.Empty, "Credenciales inválidas. Verifique su correo electrónico y contraseña.");
         return View(model);
     }
 

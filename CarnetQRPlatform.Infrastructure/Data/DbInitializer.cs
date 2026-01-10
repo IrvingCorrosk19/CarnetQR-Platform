@@ -1,6 +1,7 @@
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Domain.Enums;
+using CarnetQRPlatform.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -98,6 +99,18 @@ public static class DbInitializer
             context.Institutions.Add(demoInstitution);
             await context.SaveChangesAsync();
 
+            // Inicializar templates predefinidos para la institución demo
+            try
+            {
+                var templateInitializer = new CardTemplateInitializer(context);
+                await templateInitializer.InitializeDefaultTemplatesAsync(demoInstitution.Id);
+                logger?.LogInformation("Default card templates initialized for demo institution.");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Could not initialize default card templates for demo institution: {Message}", ex.Message);
+            }
+
             var adminEmail = "admin@demo.com";
             var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
 
@@ -124,6 +137,26 @@ public static class DbInitializer
                 {
                     var errors = string.Join(", ", result.Errors.Select(e => e.Description));
                     logger?.LogError("Error creating InstitutionAdmin: {Errors}", errors);
+                }
+            }
+        }
+        else
+        {
+            // Si la institución ya existe, verificar si tiene templates y crearlos si no existen
+            var hasTemplates = await context.CardTemplates
+                .AnyAsync(t => t.InstitutionId == demoInstitution.Id);
+
+            if (!hasTemplates)
+            {
+                try
+                {
+                    var templateInitializer = new CardTemplateInitializer(context);
+                    await templateInitializer.InitializeDefaultTemplatesAsync(demoInstitution.Id);
+                    logger?.LogInformation("Default card templates initialized for existing demo institution.");
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex, "Could not initialize default card templates for existing demo institution: {Message}", ex.Message);
                 }
             }
         }

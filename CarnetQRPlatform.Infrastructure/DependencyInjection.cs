@@ -54,6 +54,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Services.IEventService, Infrastructure.Services.EventService>();
         services.AddScoped<Application.Services.ICardTemplateService, Infrastructure.Services.CardTemplateService>();
         services.AddScoped<IAuditService, AuditService>();
+        
+        // Template Initializer (transient porque puede usarse fuera del contexto HTTP)
+        services.AddTransient<CardTemplateInitializer>();
 
         services.AddAuthorization(options =>
         {

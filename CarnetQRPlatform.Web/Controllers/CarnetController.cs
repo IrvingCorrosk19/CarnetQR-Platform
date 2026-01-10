@@ -1,4 +1,6 @@
+using System.Text.Json;
 using CarnetQRPlatform.Application.Services;
+using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Web.Models;
 using CarnetQRPlatform.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,15 +12,18 @@ namespace CarnetQRPlatform.Web.Controllers;
 public class CarnetController : Controller
 {
     private readonly ICardService _cardService;
+    private readonly ICardTemplateService _cardTemplateService;
     private readonly QrCodeService _qrCodeService;
     private readonly ILogger<CarnetController> _logger;
 
     public CarnetController(
         ICardService cardService,
+        ICardTemplateService cardTemplateService,
         QrCodeService qrCodeService,
         ILogger<CarnetController> logger)
     {
         _cardService = cardService;
+        _cardTemplateService = cardTemplateService;
         _qrCodeService = qrCodeService;
         _logger = logger;
     }
@@ -49,6 +54,44 @@ public class CarnetController : Controller
         var qrCodeBase64 = _qrCodeService.GenerateQrCodeBase64(qrUrl, size: 200);
 
         // Construir ViewModel
+        var photoEnabled = card.Institution?.PhotoEnabled == true && !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath);
+        
+        // Cargar template si existe (por defecto o específico vía query string)
+        CardTemplate? template = null;
+        if (Request.Query.ContainsKey("templateId"))
+        {
+            if (Guid.TryParse(Request.Query["templateId"], out var templateId))
+            {
+                template = await _cardTemplateService.GetByIdAsync(templateId);
+            }
+        }
+        else
+        {
+            // Cargar template por defecto de la institución
+            template = await _cardTemplateService.GetDefaultTemplateAsync();
+        }
+
+        // Crear configuración inicial
+        var config = new PrintCardConfig();
+        
+        // Aplicar configuraciones desde template si existe
+        if (template != null && template.TemplateConfig != null && template.TemplateConfig.Count > 0)
+        {
+            ApplyTemplateConfig(config, template.TemplateConfig);
+        }
+
+        // Aplicar configuraciones de institución como fallback
+        config.ShowPhoto = photoEnabled;
+        if (card.Institution != null)
+        {
+            config.ShowLogo = !string.IsNullOrEmpty(card.Institution.LogoPath);
+            // Si hay campos visibles configurados en la institución, aplicarlos
+            if (card.Institution.VisibleFields != null && card.Institution.VisibleFields.Any())
+            {
+                ApplyInstitutionVisibleFields(config, card.Institution.VisibleFields);
+            }
+        }
+
         var viewModel = new PrintCardViewModel
         {
             CardNumber = card.CardNumber,
@@ -68,99 +111,250 @@ public class CarnetController : Controller
             
             QrCodeBase64 = qrCodeBase64,
             
-            Config = new PrintCardConfig
-            {
-                // Tamaño estándar de tarjeta (85.6mm x 54mm)
-                Width = 85.6,
-                Height = 54.0,
-                Orientation = "horizontal",
-                
-                // Elementos visibles por defecto
-                ShowLogo = !string.IsNullOrEmpty(card.Institution?.LogoPath),
-                ShowInstitutionName = true,
-                ShowUserName = true,
-                ShowCardNumber = true,
-                ShowQrCode = true,
-                ShowPhoto = card.Institution?.PhotoEnabled == true && !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath),
-                ShowIdentificationNumber = false,
-                ShowEmail = false,
-                ShowPhone = false
-            }
+            Config = config
         };
 
-        // Permitir personalización vía query string
-        if (Request.Query.ContainsKey("width"))
-        {
-            if (double.TryParse(Request.Query["width"], out var width))
-                viewModel.Config.Width = width;
-        }
-        
-        if (Request.Query.ContainsKey("height"))
-        {
-            if (double.TryParse(Request.Query["height"], out var height))
-                viewModel.Config.Height = height;
-        }
-        
-        if (Request.Query.ContainsKey("orientation"))
-        {
-            viewModel.Config.Orientation = Request.Query["orientation"].ToString().ToLower();
-        }
-        
-        if (Request.Query.ContainsKey("showLogo"))
-        {
-            if (bool.TryParse(Request.Query["showLogo"], out var showLogo))
-                viewModel.Config.ShowLogo = showLogo;
-        }
-        
-        if (Request.Query.ContainsKey("showInstitutionName"))
-        {
-            if (bool.TryParse(Request.Query["showInstitutionName"], out var showInstitutionName))
-                viewModel.Config.ShowInstitutionName = showInstitutionName;
-        }
-        
-        if (Request.Query.ContainsKey("showUserName"))
-        {
-            if (bool.TryParse(Request.Query["showUserName"], out var showUserName))
-                viewModel.Config.ShowUserName = showUserName;
-        }
-        
-        if (Request.Query.ContainsKey("showCardNumber"))
-        {
-            if (bool.TryParse(Request.Query["showCardNumber"], out var showCardNumber))
-                viewModel.Config.ShowCardNumber = showCardNumber;
-        }
-        
-        if (Request.Query.ContainsKey("showQrCode"))
-        {
-            if (bool.TryParse(Request.Query["showQrCode"], out var showQrCode))
-                viewModel.Config.ShowQrCode = showQrCode;
-        }
-        
-        if (Request.Query.ContainsKey("showIdentificationNumber"))
-        {
-            if (bool.TryParse(Request.Query["showIdentificationNumber"], out var showId))
-                viewModel.Config.ShowIdentificationNumber = showId;
-        }
-        
-        if (Request.Query.ContainsKey("showEmail"))
-        {
-            if (bool.TryParse(Request.Query["showEmail"], out var showEmail))
-                viewModel.Config.ShowEmail = showEmail;
-        }
-        
-        if (Request.Query.ContainsKey("showPhone"))
-        {
-            if (bool.TryParse(Request.Query["showPhone"], out var showPhone))
-                viewModel.Config.ShowPhone = showPhone;
-        }
-        
-        if (Request.Query.ContainsKey("showPhoto"))
-        {
-            if (bool.TryParse(Request.Query["showPhoto"], out var showPhoto))
-                viewModel.Config.ShowPhoto = showPhoto;
-        }
+        // Permitir override vía query string (sobrescribe configuraciones de template)
+        ApplyQueryStringOverrides(viewModel.Config);
 
         return View("PrintCarnet", viewModel);
+    }
+
+    /// <summary>
+    /// Aplica configuraciones desde TemplateConfig (Dictionary) a PrintCardConfig
+    /// </summary>
+    private void ApplyTemplateConfig(PrintCardConfig config, Dictionary<string, object> templateConfig)
+    {
+        foreach (var kvp in templateConfig)
+        {
+            try
+            {
+                var property = typeof(PrintCardConfig).GetProperty(kvp.Key, 
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
+                
+                if (property != null && property.CanWrite)
+                {
+                    var value = ConvertValue(kvp.Value, property.PropertyType);
+                    if (value != null)
+                    {
+                        property.SetValue(config, value);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error aplicando configuración de template: {Key} = {Value}", kvp.Key, kvp.Value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Aplica campos visibles desde la configuración de institución
+    /// </summary>
+    private void ApplyInstitutionVisibleFields(PrintCardConfig config, List<string> visibleFields)
+    {
+        // Resetear todos los campos a false primero
+        config.ShowIdentificationNumber = false;
+        config.ShowEmail = false;
+        config.ShowPhone = false;
+        config.ShowDateOfBirth = false;
+
+        foreach (var field in visibleFields)
+        {
+            switch (field.ToLower())
+            {
+                case "identificationnumber":
+                case "identification":
+                case "id":
+                    config.ShowIdentificationNumber = true;
+                    break;
+                case "email":
+                    config.ShowEmail = true;
+                    break;
+                case "phone":
+                case "telephone":
+                    config.ShowPhone = true;
+                    break;
+                case "dateofbirth":
+                case "dob":
+                case "birthdate":
+                    config.ShowDateOfBirth = true;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Convierte un valor a un tipo específico
+    /// </summary>
+    private object? ConvertValue(object value, Type targetType)
+    {
+        if (value == null) return null;
+        
+        var sourceType = value.GetType();
+        
+        // Si ya es del tipo correcto, retornar directamente
+        if (targetType.IsAssignableFrom(sourceType))
+        {
+            return value;
+        }
+
+        // Manejar conversiones comunes
+        if (targetType == typeof(double) || targetType == typeof(double?))
+        {
+            if (double.TryParse(value.ToString(), out var d))
+                return d;
+        }
+        else if (targetType == typeof(bool) || targetType == typeof(bool?))
+        {
+            if (bool.TryParse(value.ToString(), out var b))
+                return b;
+        }
+        else if (targetType == typeof(int) || targetType == typeof(int?))
+        {
+            if (int.TryParse(value.ToString(), out var i))
+                return i;
+        }
+        else if (targetType == typeof(string))
+        {
+            return value.ToString();
+        }
+        else if (targetType == typeof(Dictionary<string, string>))
+        {
+            if (value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
+            {
+                var dict = new Dictionary<string, string>();
+                foreach (var prop in jsonElement.EnumerateObject())
+                {
+                    dict[prop.Name] = prop.Value.ToString();
+                }
+                return dict;
+            }
+            if (value is Dictionary<string, object> dictObj)
+            {
+                return dictObj.ToDictionary(k => k.Key, v => v.Value?.ToString() ?? string.Empty);
+            }
+        }
+        else if (targetType == typeof(List<string>))
+        {
+            if (value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+            {
+                return jsonElement.EnumerateArray().Select(e => e.ToString()).ToList();
+            }
+            if (value is IEnumerable<object> enumerable)
+            {
+                return enumerable.Select(o => o?.ToString() ?? string.Empty).ToList();
+            }
+        }
+
+        return Convert.ChangeType(value, targetType);
+    }
+
+    /// <summary>
+    /// Aplica sobreescrituras desde query string
+    /// </summary>
+    private void ApplyQueryStringOverrides(PrintCardConfig config)
+    {
+        // Tamaño y orientación
+        if (Request.Query.ContainsKey("width") && double.TryParse(Request.Query["width"], out var width))
+            config.Width = width;
+        
+        if (Request.Query.ContainsKey("height") && double.TryParse(Request.Query["height"], out var height))
+            config.Height = height;
+        
+        if (Request.Query.ContainsKey("orientation"))
+            config.Orientation = Request.Query["orientation"].ToString().ToLower();
+
+        // Colores
+        if (Request.Query.ContainsKey("primaryColor"))
+            config.PrimaryColor = Request.Query["primaryColor"].ToString();
+        
+        if (Request.Query.ContainsKey("secondaryColor"))
+            config.SecondaryColor = Request.Query["secondaryColor"].ToString();
+        
+        if (Request.Query.ContainsKey("backgroundColor"))
+            config.BackgroundColor = Request.Query["backgroundColor"].ToString();
+        
+        if (Request.Query.ContainsKey("textColor"))
+            config.TextColor = Request.Query["textColor"].ToString();
+
+        // Tamaños de elementos
+        if (Request.Query.ContainsKey("qrSize") && double.TryParse(Request.Query["qrSize"], out var qrSize))
+            config.QrSize = qrSize;
+        
+        if (Request.Query.ContainsKey("photoWidth") && double.TryParse(Request.Query["photoWidth"], out var photoWidth))
+            config.PhotoWidth = photoWidth;
+        
+        if (Request.Query.ContainsKey("photoHeight") && double.TryParse(Request.Query["photoHeight"], out var photoHeight))
+            config.PhotoHeight = photoHeight;
+
+        // Posicionamiento
+        if (Request.Query.ContainsKey("photoPosition"))
+            config.PhotoPosition = Request.Query["photoPosition"].ToString().ToLower();
+        
+        if (Request.Query.ContainsKey("qrPosition"))
+            config.QrPosition = Request.Query["qrPosition"].ToString().ToLower();
+        
+        if (Request.Query.ContainsKey("logoPosition"))
+            config.LogoPosition = Request.Query["logoPosition"].ToString().ToLower();
+        
+        if (Request.Query.ContainsKey("textAlignment"))
+            config.TextAlignment = Request.Query["textAlignment"].ToString().ToLower();
+
+        // Layout
+        if (Request.Query.ContainsKey("layoutStyle"))
+            config.LayoutStyle = Request.Query["layoutStyle"].ToString().ToLower();
+
+        // Elementos visibles (sobrescribir valores del template)
+        if (Request.Query.ContainsKey("showLogo") && bool.TryParse(Request.Query["showLogo"], out var showLogo))
+            config.ShowLogo = showLogo;
+        
+        if (Request.Query.ContainsKey("showInstitutionName") && bool.TryParse(Request.Query["showInstitutionName"], out var showInstitutionName))
+            config.ShowInstitutionName = showInstitutionName;
+        
+        if (Request.Query.ContainsKey("showUserName") && bool.TryParse(Request.Query["showUserName"], out var showUserName))
+            config.ShowUserName = showUserName;
+        
+        if (Request.Query.ContainsKey("showCardNumber") && bool.TryParse(Request.Query["showCardNumber"], out var showCardNumber))
+            config.ShowCardNumber = showCardNumber;
+        
+        if (Request.Query.ContainsKey("showQrCode") && bool.TryParse(Request.Query["showQrCode"], out var showQrCode))
+            config.ShowQrCode = showQrCode;
+        
+        if (Request.Query.ContainsKey("showPhoto") && bool.TryParse(Request.Query["showPhoto"], out var showPhoto))
+            config.ShowPhoto = showPhoto;
+        
+        if (Request.Query.ContainsKey("showIdentificationNumber") && bool.TryParse(Request.Query["showIdentificationNumber"], out var showId))
+            config.ShowIdentificationNumber = showId;
+        
+        if (Request.Query.ContainsKey("showEmail") && bool.TryParse(Request.Query["showEmail"], out var showEmail))
+            config.ShowEmail = showEmail;
+        
+        if (Request.Query.ContainsKey("showPhone") && bool.TryParse(Request.Query["showPhone"], out var showPhone))
+            config.ShowPhone = showPhone;
+        
+        if (Request.Query.ContainsKey("showDateOfBirth") && bool.TryParse(Request.Query["showDateOfBirth"], out var showDob))
+            config.ShowDateOfBirth = showDob;
+
+        // Configuración de dos caras
+        if (Request.Query.ContainsKey("doubleSided") && bool.TryParse(Request.Query["doubleSided"], out var doubleSided))
+        {
+            config.DoubleSided = doubleSided;
+        }
+        
+        if (Request.Query.ContainsKey("qrOnBack") && bool.TryParse(Request.Query["qrOnBack"], out var qrOnBack))
+        {
+            config.QrOnBack = qrOnBack;
+            // Si QR va en la trasera, automáticamente activar dos caras
+            if (qrOnBack)
+            {
+                config.DoubleSided = true;
+                config.ShowQrCode = false; // No mostrar QR en el frente
+            }
+        }
+        
+        if (Request.Query.ContainsKey("backRotate180") && bool.TryParse(Request.Query["backRotate180"], out var backRotate180))
+            config.BackRotate180 = backRotate180;
     }
 }
 

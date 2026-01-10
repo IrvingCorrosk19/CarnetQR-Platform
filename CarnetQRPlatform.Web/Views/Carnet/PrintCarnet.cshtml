@@ -1,4 +1,5 @@
 @model CarnetQRPlatform.Web.Models.PrintCardViewModel
+@using System.Globalization
 @{
     Layout = null;
     ViewData["Title"] = "Imprimir Carnet";
@@ -6,6 +7,83 @@
     var config = Model.Config;
     var width = config.Orientation == "vertical" ? config.Height : config.Width;
     var height = config.Orientation == "vertical" ? config.Width : config.Height;
+    
+    // Calcular colores y estilos dinámicamente
+    var bgGradient = config.ShowGradient && !string.IsNullOrEmpty(config.BackgroundGradient) 
+        ? config.BackgroundGradient 
+        : $"linear-gradient(135deg, {config.BackgroundColor} 0%, {config.SecondaryColor} 100%)";
+    var bgColor = config.ShowGradient ? "transparent" : config.BackgroundColor;
+    var borderStyleValue = $"{config.BorderWidth}mm {config.BorderStyle} {config.BorderColor}";
+    
+    // Aplicar layouts predefinidos
+    var isCompact = config.LayoutStyle == "compact";
+    var isExpanded = config.LayoutStyle == "expanded";
+    var isProfessional = config.LayoutStyle == "professional";
+    var isSimple = config.LayoutStyle == "simple";
+    var isModern = config.LayoutStyle == "modern";
+    
+    // Ajustar según layout
+    if (isCompact) {
+        config.Padding = Math.Max(config.Padding - 2, 3);
+        config.SpacingBetweenElements = Math.Max(config.SpacingBetweenElements - 1, 2);
+        config.FontSizeName = Math.Max(config.FontSizeName - 1, 10);
+    }
+    if (isExpanded) {
+        config.Padding = config.Padding + 2;
+        config.SpacingBetweenElements = config.SpacingBetweenElements + 2;
+    }
+    if (isSimple) {
+        config.ShowShadow = false;
+        config.ShowGradient = false;
+        config.BorderWidth = 1;
+        config.BorderRadius = 5;
+    }
+    
+    // Posicionamiento de logo - pre-calcular estilos
+    var logoPositionClass = "logo-" + config.LogoPosition.Replace("-", "");
+    var logoPositionStyle = "";
+    switch (config.LogoPosition.ToLower()) {
+        case "top-right":
+            logoPositionStyle = "order: 2; margin-left: auto;";
+            break;
+        case "top-center":
+            logoPositionStyle = "order: 1; margin: 0 auto;";
+            break;
+        default:
+            logoPositionStyle = "order: 1;";
+            break;
+    }
+    
+    // Posicionamiento de foto
+    var photoPositionClass = "photo-" + config.PhotoPosition;
+    
+    // Posicionamiento de QR - pre-calcular estilos
+    var qrPositionClass = "qr-" + config.QrPosition.Replace("-", "");
+    var qrPositionStyle = "";
+    var qrPadding = config.Padding + 3;
+    switch (config.QrPosition.ToLower()) {
+        case "top-left":
+            qrPositionStyle = $"position: absolute; top: {qrPadding}mm; left: {config.Padding}mm;";
+            break;
+        case "top-right":
+            qrPositionStyle = $"position: absolute; top: {qrPadding}mm; right: {config.Padding}mm;";
+            break;
+        case "bottom-left":
+            qrPositionStyle = $"position: absolute; bottom: {qrPadding}mm; left: {config.Padding}mm;";
+            break;
+        case "bottom-right":
+            qrPositionStyle = $"position: absolute; bottom: {qrPadding}mm; right: {config.Padding}mm;";
+            break;
+        case "center":
+            qrPositionStyle = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);";
+            break;
+        default:
+            qrPositionStyle = "";
+            break;
+    }
+    
+    // Determinar si QR está en posición absoluta
+    var qrIsAbsolute = !string.IsNullOrEmpty(qrPositionStyle) && qrPositionStyle.Contains("position: absolute");
 }
 
 <!DOCTYPE html>
@@ -15,6 +93,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@ViewData["Title"] - @Model.CardNumber</title>
     <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap');
+        
         * {
             margin: 0;
             padding: 0;
@@ -22,7 +102,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: @config.FontFamily;
             background: #f5f5f5;
             padding: 20px;
             display: flex;
@@ -31,146 +111,275 @@
             min-height: 100vh;
         }
 
-        /* Contenedor del carnet */
+        /* Contenedor del carnet con todas las configuraciones */
         .carnet-container {
             width: @(width)mm;
             height: @(height)mm;
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            padding: 6mm;
+            background: @(config.ShowGradient ? bgGradient : bgColor);
+            border-radius: @(config.BorderRadius)mm;
+            @if (config.ShowShadow) {
+                <text>box-shadow: 0 4px 20px rgba(0, 0, 0, @config.ShadowOpacity);</text>
+            }
+            padding: @(config.Padding)mm;
             position: relative;
             overflow: hidden;
-            border: 2px solid #667eea;
+            border: @borderStyleValue;
             display: flex;
             flex-direction: column;
+            margin-top: @(config.MarginTop)mm;
+            margin-bottom: @(config.MarginBottom)mm;
+            margin-left: @(config.MarginLeft)mm;
+            margin-right: @(config.MarginRight)mm;
+            color: @config.TextColor;
         }
         
-        /* Decoración de fondo sutil */
-        .carnet-container::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 150%;
-            height: 150%;
-            background: radial-gradient(circle, rgba(102, 126, 234, 0.05) 0%, transparent 70%);
-            pointer-events: none;
+        /* Watermark */
+        @if (!string.IsNullOrEmpty(config.Watermark)) {
+            <text>
+            .carnet-container::after {
+                content: '@config.Watermark';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(-45deg);
+                font-size: 40pt;
+                font-weight: bold;
+                color: @config.PrimaryColor;
+                opacity: @config.WatermarkOpacity;
+                pointer-events: none;
+                white-space: nowrap;
+                z-index: 0;
+            }
+            </text>
+        }
+        
+        /* Decoración de fondo sutil (solo si no es simple) */
+        @if (!isSimple && config.ShowGradient) {
+            <text>
+            .carnet-container::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                right: -20%;
+                width: 150%;
+                height: 150%;
+                background: radial-gradient(circle, @config.PrimaryColor@(Convert.ToInt32(config.ShadowOpacity * 255).ToString("X2")) 0%, transparent 70%);
+                pointer-events: none;
+                z-index: 0;
+            }
+            </text>
         }
 
-        /* Header con logo y nombre de institución */
+        /* Header con logo y nombre de institución - Posicionamiento dinámico */
         .carnet-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 5mm;
+            margin-bottom: @(config.SpacingBetweenElements)mm;
             padding-bottom: 3mm;
-            border-bottom: 2px solid #667eea;
+            border-bottom: 2px solid @config.PrimaryColor;
             position: relative;
             z-index: 1;
+            text-align: @config.TextAlignment;
+        }
+        
+        @if (config.LogoPosition == "top-center") {
+            <text>
+            .carnet-header {
+                flex-direction: column;
+                gap: 2mm;
+            }
+            </text>
         }
 
         .carnet-logo {
-            max-width: 25mm;
-            max-height: 15mm;
+            max-width: @(config.LogoWidth)mm;
+            max-height: @(config.LogoHeight)mm;
             object-fit: contain;
+            @if (!string.IsNullOrEmpty(logoPositionStyle)) {
+                @Html.Raw("/* Logo position */ " + logoPositionStyle)
+            }
         }
 
         .carnet-institution-name {
-            font-size: 9pt;
-            font-weight: bold;
-            color: #333;
-            text-align: right;
+            font-size: @(config.FontSizeDetails)pt;
+            font-weight: @config.FontWeightDetails;
+            color: @config.TextColor;
+            text-align: @config.TextAlignment;
             flex: 1;
             margin-left: 4mm;
         }
+        
+        @if (config.LogoPosition == "top-center") {
+            <text>
+            .carnet-institution-name {
+                margin-left: 0;
+                text-align: center;
+            }
+            </text>
+        }
 
-        /* Cuerpo del carnet */
+        /* Cuerpo del carnet - Layout dinámico según posición de foto */
         .carnet-body {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 4mm;
+            gap: @(config.SpacingBetweenElements)mm;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+        
+        @if (config.PhotoPosition == "top" || config.PhotoPosition == "bottom") {
+            <text>
+            .carnet-body {
+                flex-direction: column;
+            }
+            </text>
+        }
+        
+        @if (config.PhotoPosition == "right") {
+            <text>
+            .carnet-body {
+                flex-direction: row-reverse;
+            }
+            </text>
         }
 
         .carnet-info {
             flex: 1;
+            text-align: @config.TextAlignment;
+        }
+        
+        @if (config.TextAlignment == "center") {
+            <text>
+            .carnet-info {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            </text>
+        }
+        
+        @if (config.TextAlignment == "right") {
+            <text>
+            .carnet-info {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+            </text>
         }
 
         .carnet-user-name {
-            font-size: 13pt;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 2mm;
+            font-size: @(config.FontSizeName)pt;
+            font-weight: @config.FontWeightName;
+            color: @config.TextColor;
+            margin-bottom: @(config.SpacingBetweenElements)mm;
             line-height: 1.3;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            @if (isProfessional) {
+                <text>text-transform: uppercase; letter-spacing: 1px;</text>
+            }
         }
 
         .carnet-card-number {
-            font-size: 10pt;
-            color: #667eea;
+            font-size: @(config.FontSizeCardNumber)pt;
+            color: @config.PrimaryColor;
             font-weight: 600;
-            margin-bottom: 2mm;
+            margin-bottom: @(config.SpacingBetweenElements)mm;
         }
 
         .carnet-details {
-            font-size: 8pt;
-            color: #666;
+            font-size: @(config.FontSizeDetails)pt;
+            color: @config.TextColor;
             line-height: 1.6;
+            opacity: 0.9;
         }
 
         .carnet-detail-item {
             margin-bottom: 1mm;
         }
 
+        /* Foto con posicionamiento y tamaño dinámico */
         .carnet-photo {
             flex-shrink: 0;
             text-align: center;
-            margin-right: 3mm;
+            margin-right: @if (config.PhotoPosition == "left") { <text>3mm</text> } else { <text>0</text> };
+            margin-left: @if (config.PhotoPosition == "right") { <text>3mm</text> } else { <text>0</text> };
+            margin-bottom: @if (config.PhotoPosition == "top") { <text>3mm</text> } else { <text>0</text> };
+            margin-top: @if (config.PhotoPosition == "bottom") { <text>3mm</text> } else { <text>0</text> };
+            @if (config.PhotoPosition == "center") {
+                <text>position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 0; opacity: 0.1;</text>
+            }
         }
 
         .carnet-photo img {
-            width: 25mm;
-            height: 30mm;
+            width: @(config.PhotoWidth)mm;
+            height: @(config.PhotoHeight)mm;
             object-fit: cover;
-            border: 2px solid #667eea;
-            border-radius: 4px;
+            border: 2px solid @config.PrimaryColor;
+            border-radius: @(config.BorderRadius / 2)mm;
             background: white;
-            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.15);
+            @if (config.ShowShadow) {
+                <text>box-shadow: 0 2px 6px rgba(0, 0, 0, @(config.ShadowOpacity * 0.8));</text>
+            }
         }
 
+        /* QR con posicionamiento y tamaño dinámico */
         .carnet-qr {
             flex-shrink: 0;
             text-align: center;
+            @if (qrIsAbsolute && !string.IsNullOrEmpty(qrPositionStyle)) {
+                @Html.Raw(qrPositionStyle)
+            }
+        }
+        
+        @if (qrIsAbsolute) {
+            <text>
+            .carnet-body {
+                position: relative;
+            }
+            </text>
         }
 
         .carnet-qr img {
-            width: 28mm;
-            height: 28mm;
-            border: 2px solid #667eea;
-            border-radius: 6px;
+            width: @(config.QrSize)mm;
+            height: @(config.QrSize)mm;
+            border: 2px solid @config.PrimaryColor;
+            border-radius: @(config.BorderRadius / 2)mm;
             padding: 2mm;
             background: white;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+            @if (config.ShowShadow) {
+                <text>box-shadow: 0 2px 8px rgba(0, 0, 0, @(config.ShadowOpacity * 0.8));</text>
+            }
         }
 
         .carnet-qr-label {
             font-size: 7pt;
-            color: #999;
+            color: @config.TextColor;
+            opacity: 0.7;
             margin-top: 2mm;
         }
 
         /* Footer */
         .carnet-footer {
             margin-top: auto;
-            padding-top: 2mm;
-            border-top: 1px solid #e0e0e0;
-            font-size: 7pt;
-            color: #999;
-            text-align: center;
+            padding-top: @(config.SpacingBetweenElements)mm;
+            border-top: 1px solid @config.BorderColor;
+            opacity: 0.6;
+            font-size: @(config.FontSizeDetails - 1)pt;
+            color: @config.TextColor;
+            text-align: @config.TextAlignment;
             position: relative;
             z-index: 1;
+        }
+        
+        @if (!string.IsNullOrEmpty(config.FooterText)) {
+            <text>
+            .carnet-footer::after {
+                content: ' | @config.FooterText';
+            }
+            </text>
         }
 
         /* Botones de control (solo en pantalla) */
@@ -186,7 +395,7 @@
         }
 
         .print-controls button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, @config.PrimaryColor 0%, @config.SecondaryColor 100%);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -200,11 +409,95 @@
 
         .print-controls button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px @config.PrimaryColor;
         }
 
         .print-controls button.secondary {
             background: #6c757d;
+        }
+
+        /* Estilos para carnet de dos caras - Vista trasera */
+        .carnet-container-back {
+            width: @(width)mm;
+            height: @(height)mm;
+            background: @(config.BackBackgroundColor);
+            border-radius: @(config.BorderRadius)mm;
+            @if (config.ShowShadow) {
+                <text>box-shadow: 0 4px 20px rgba(0, 0, 0, @config.ShadowOpacity);</text>
+            }
+            padding: @(config.Padding)mm;
+            position: relative;
+            overflow: hidden;
+            border: @borderStyleValue;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            margin-bottom: @(config.MarginBottom)mm;
+            margin-left: @(config.MarginLeft)mm;
+            margin-right: @(config.MarginRight)mm;
+            color: @config.TextColor;
+        }
+
+        .carnet-container-back::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -20%;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle, @config.SecondaryColor@(Convert.ToInt32(config.ShadowOpacity * 100).ToString("X2")) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .carnet-back-content {
+            text-align: @config.BackTextAlignment;
+            position: relative;
+            z-index: 1;
+            width: 100%;
+        }
+
+        .carnet-back-qr {
+            margin-bottom: 5mm;
+        }
+
+        .carnet-back-qr img {
+            width: @(config.QrBackSize)mm;
+            height: @(config.QrBackSize)mm;
+            border: 2px solid @config.PrimaryColor;
+            border-radius: @(config.BorderRadius / 2)mm;
+            padding: 3mm;
+            background: white;
+            @if (config.ShowShadow) {
+                <text>box-shadow: 0 2px 10px rgba(0, 0, 0, @(config.ShadowOpacity * 0.8));</text>
+            }
+        }
+
+        .carnet-back-text {
+            font-size: @(config.FontSizeDetails)pt;
+            color: @config.TextColor;
+            margin-top: 3mm;
+        }
+
+        .carnet-back-instruction {
+            font-size: @(config.FontSizeDetails - 1)pt;
+            color: @config.TextColor;
+            opacity: 0.8;
+            margin-top: 2mm;
+        }
+
+        /* Separador visual entre frente y trasera (solo en pantalla) */
+        .carnet-divider {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            font-size: 10pt;
+            color: #666;
+            font-weight: 600;
         }
 
         /* Estilos para impresión */
@@ -219,11 +512,27 @@
                 display: none !important;
             }
 
+            .carnet-divider {
+                display: none !important;
+            }
+
             .carnet-container {
-                margin: 0;
-                box-shadow: none;
-                border: 1px solid #ccc;
+                margin: 0 !important;
+                @if (!config.ShowShadow) {
+                    <text>box-shadow: none;</text>
+                }
+                border: @config.BorderWidth mm @config.BorderStyle @config.BorderColor;
+                page-break-after: @(config.DoubleSided ? "always" : "auto");
+            }
+
+            .carnet-container-back {
+                margin: 0 !important;
+                @if (!config.ShowShadow) {
+                    <text>box-shadow: none;</text>
+                }
+                border: @config.BorderWidth mm @config.BorderStyle @config.BorderColor;
                 page-break-after: always;
+                page-break-before: always;
             }
 
             @@page {
@@ -235,17 +544,70 @@
                 margin: 0;
                 padding: 0;
             }
+
+            /* Para impresión de dos caras - cada cara en su propia página */
+            @if (config.DoubleSided) {
+                <text>
+                .carnet-container {
+                    page-break-after: always;
+                }
+                
+                .carnet-container-back {
+                    page-break-before: always;
+                    page-break-after: always;
+                }
+                </text>
+                
+                @if (config.BackRotate180 && config.QrOnBack) {
+                    <text>
+                    .carnet-container-back {
+                        transform: rotate(180deg);
+                    }
+                    
+                    .carnet-back-content {
+                        transform: rotate(180deg);
+                    }
+                    </text>
+                }
+            }
         }
 
-        /* Ajustes para orientación vertical */
-        @if (config.Orientation == "vertical") {
+        /* Layouts específicos */
+        @if (isCompact) {
+            <text>
+            .carnet-user-name { font-size: @(config.FontSizeName - 1)pt; }
+            .carnet-card-number { font-size: @(config.FontSizeCardNumber - 1)pt; }
+            .carnet-details { font-size: @(config.FontSizeDetails - 1)pt; }
+            </text>
+        }
+        
+        @if (isProfessional) {
             <text>
             .carnet-body {
-                flex-direction: column;
+                align-items: center;
             }
-            
-            .carnet-qr {
-                align-self: center;
+            .carnet-user-name {
+                font-size: @(config.FontSizeName + 1)pt;
+                letter-spacing: 0.5px;
+            }
+            </text>
+        }
+        
+        @if (isModern) {
+            <text>
+            .carnet-container {
+                background: linear-gradient(135deg, @config.PrimaryColor 0%, @config.SecondaryColor 100%);
+                color: white;
+            }
+            .carnet-institution-name,
+            .carnet-user-name,
+            .carnet-details,
+            .carnet-card-number {
+                color: white;
+            }
+            .carnet-photo img,
+            .carnet-qr img {
+                border-color: white;
             }
             </text>
         }
@@ -322,23 +684,135 @@
                             <strong>Tel:</strong> @Model.Phone
                         </div>
                     }
+                    
+                    @if (config.ShowDateOfBirth && Model.DateOfBirth.HasValue)
+                    {
+                        <div class="carnet-detail-item">
+                            <strong>Fecha de Nacimiento:</strong> @Model.DateOfBirth.Value.ToString(config.DateFormat)
+                        </div>
+                    }
+                    
+                    @if (config.ShowIssuedDate)
+                    {
+                        <div class="carnet-detail-item">
+                            <strong>Emitido:</strong> @Model.IssuedAt.ToString(config.DateFormat)
+                        </div>
+                    }
+                    
+                    @* Campos personalizados *@
+                    @if (config.CustomFields != null && config.CustomFields.Any())
+                    {
+                        @foreach (var field in config.CustomFields)
+                        {
+                            <div class="carnet-detail-item">
+                                <strong>@field.Key:</strong> @field.Value
+                            </div>
+                        }
+                    }
                 </div>
             </div>
 
-            @if (config.ShowQrCode && !string.IsNullOrEmpty(Model.QrCodeBase64))
+            @* Mostrar QR solo si NO va en la parte trasera *@
+            @if (config.ShowQrCode && !string.IsNullOrEmpty(Model.QrCodeBase64) && !config.QrOnBack)
             {
-                <div class="carnet-qr">
-                    <img src="@Model.QrCodeBase64" alt="Código QR">
-                    <div class="carnet-qr-label">Escanea para verificar</div>
-                </div>
+                if (qrIsAbsolute)
+                {
+                    @* QR en posición absoluta (top-left, top-right, bottom-left, bottom-right, center) *@
+                    <div class="carnet-qr" style="@qrPositionStyle">
+                        <img src="@Model.QrCodeBase64" alt="Código QR">
+                        <div class="carnet-qr-label">Escanea</div>
+                    </div>
+                }
+                else
+                {
+                    @* QR en posición relativa (left, right, flex) *@
+                    <div class="carnet-qr">
+                        <img src="@Model.QrCodeBase64" alt="Código QR">
+                        <div class="carnet-qr-label">Escanea para verificar</div>
+                    </div>
+                }
             }
         </div>
 
         <!-- Footer -->
-        <div class="carnet-footer">
-            Emitido: @Model.IssuedAt.ToString("dd/MM/yyyy")
-        </div>
+        @if (config.ShowIssuedDate || !string.IsNullOrEmpty(config.FooterText))
+        {
+            <div class="carnet-footer">
+                @if (config.ShowIssuedDate)
+                {
+                    <text>Emitido: @Model.IssuedAt.ToString(config.DateFormat)</text>
+                }
+            </div>
+        }
     </div>
+
+    @* Vista de la parte trasera (solo si está configurada para dos caras) *@
+    @if (config.DoubleSided)
+    {
+        <div class="carnet-divider">
+            ════════════════════════════════════════
+            PARTE TRASERA DEL CARNET
+            ════════════════════════════════════════
+        </div>
+
+        <div class="carnet-container-back">
+            <div class="carnet-back-content">
+                @if (config.QrOnBack && !string.IsNullOrEmpty(Model.QrCodeBase64))
+                {
+                    <div class="carnet-back-qr">
+                        <img src="@Model.QrCodeBase64" alt="Código QR">
+                    </div>
+                    @if (config.BackShowInstitutionName)
+                    {
+                        <div class="carnet-back-text">
+                            <strong>@Model.InstitutionName</strong>
+                        </div>
+                    }
+                    <div class="carnet-back-instruction">
+                        @config.BackInstructions
+                    </div>
+                    @if (config.BackShowCardNumber)
+                    {
+                        <div class="carnet-back-text" style="margin-top: 3mm; font-size: 7pt;">
+                            Carnet: @Model.CardNumber
+                        </div>
+                    }
+                }
+                else
+                {
+                    @* Si no hay QR en la trasera, mostrar información alternativa *@
+                    @if (config.BackShowInstitutionName)
+                    {
+                        <div class="carnet-back-text">
+                            <strong>@Model.InstitutionName</strong>
+                        </div>
+                    }
+                    <div class="carnet-back-text" style="margin-top: 5mm;">
+                        @Model.FirstName @Model.LastName
+                    </div>
+                    @if (config.BackShowCardNumber)
+                    {
+                        <div class="carnet-back-text" style="margin-top: 3mm; font-size: 7pt;">
+                            Carnet: @Model.CardNumber
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.IdentificationNumber))
+                    {
+                        <div class="carnet-back-text" style="margin-top: 2mm; font-size: 7pt;">
+                            ID: @Model.IdentificationNumber
+                        </div>
+                    }
+                    
+                    @if (config.BackShowContactInfo && !string.IsNullOrEmpty(config.BackContactInfo))
+                    {
+                        <div class="carnet-back-text" style="margin-top: 5mm; font-size: 7pt; opacity: 0.8;">
+                            @Html.Raw(config.BackContactInfo.Replace("\n", "<br />"))
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
 
     <script>
         // Auto-imprimir si se pasa el parámetro ?autoprint=true
@@ -353,4 +827,3 @@
     </script>
 </body>
 </html>
-
