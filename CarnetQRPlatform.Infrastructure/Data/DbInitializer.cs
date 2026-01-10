@@ -71,11 +71,54 @@ public static class DbInitializer
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(superAdmin, Roles.SuperAdmin);
+                logger?.LogInformation("SuperAdmin user created: {Email}", superAdminEmail);
             }
             else
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                logger?.LogError("Error creating SuperAdmin: {Errors}", errors);
                 System.Diagnostics.Debug.WriteLine($"Error creating SuperAdmin: {errors}");
+            }
+        }
+        else
+        {
+            // Verificar que el usuario existente tenga el rol SuperAdmin
+            var userRoles = await userManager.GetRolesAsync(existingUser);
+            if (!userRoles.Contains(Roles.SuperAdmin))
+            {
+                logger?.LogWarning("SuperAdmin user exists but does not have SuperAdmin role. Adding role...");
+                var addRoleResult = await userManager.AddToRoleAsync(existingUser, Roles.SuperAdmin);
+                if (addRoleResult.Succeeded)
+                {
+                    logger?.LogInformation("SuperAdmin role added to existing user: {Email}", superAdminEmail);
+                }
+                else
+                {
+                    var errors = string.Join(", ", addRoleResult.Errors.Select(e => e.Description));
+                    logger?.LogError("Error adding SuperAdmin role to existing user: {Errors}", errors);
+                }
+            }
+            else
+            {
+                logger?.LogInformation("SuperAdmin user already exists with correct role: {Email}", superAdminEmail);
+            }
+            
+            // Asegurar que InstitutionId sea NULL para SuperAdmin
+            if (existingUser.InstitutionId.HasValue)
+            {
+                logger?.LogWarning("SuperAdmin user has InstitutionId set. Removing it...");
+                existingUser.InstitutionId = null;
+                await userManager.UpdateAsync(existingUser);
+                logger?.LogInformation("InstitutionId removed from SuperAdmin user");
+            }
+            
+            // Asegurar que esté activo
+            if (!existingUser.IsActive)
+            {
+                logger?.LogWarning("SuperAdmin user is not active. Activating...");
+                existingUser.IsActive = true;
+                await userManager.UpdateAsync(existingUser);
+                logger?.LogInformation("SuperAdmin user activated");
             }
         }
     }

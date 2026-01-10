@@ -1,0 +1,118 @@
+@{
+    ViewData["Title"] = "Acceso Denegado";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var userRoles = ViewData["UserRoles"] as List<string> ?? new List<string>();
+    var isSuperAdmin = userRoles.Contains("SuperAdmin");
+}
+
+<div class="content-wrapper">
+    <section class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1>Acceso Denegado</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Inicio</a></li>
+                        <li class="breadcrumb-item active">Acceso Denegado</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card card-danger">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-ban"></i> Acceso No Autorizado
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-danger">
+                                <h4><i class="icon fas fa-exclamation-triangle"></i> ¡Acceso Denegado!</h4>
+                                <p>No tiene permisos para acceder a esta sección del sistema.</p>
+                            </div>
+
+                            @if (isSuperAdmin)
+                            {
+                                <div class="alert alert-info">
+                                    <h5><i class="icon fas fa-info-circle"></i> Usuario SuperAdmin</h5>
+                                    <p>
+                                        Como SuperAdmin, no puede acceder a la configuración de instituciones específicas. 
+                                        Utilice el módulo de <strong>Instituciones</strong> para gestionar todas las instituciones del sistema.
+                                    </p>
+                                    <hr>
+                                    <p class="mb-0">
+                                        <a asp-controller="Institutions" asp-action="Index" class="btn btn-primary">
+                                            <i class="fas fa-building"></i> Ir a Instituciones
+                                        </a>
+                                        <a asp-controller="Home" asp-action="Index" class="btn btn-secondary">
+                                            <i class="fas fa-home"></i> Volver al Inicio
+                                        </a>
+                                    </p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    <h5><i class="icon fas fa-exclamation-triangle"></i> Permisos Insuficientes</h5>
+                                    <p>
+                                        Su cuenta no tiene los permisos necesarios para acceder a esta sección. 
+                                        Si cree que esto es un error, contacte al administrador del sistema.
+                                    </p>
+                                    @if (!string.IsNullOrEmpty(returnUrl))
+                                    {
+                                        <p><strong>URL solicitada:</strong> <code>@returnUrl</code></p>
+                                    }
+                                    @if (userRoles.Any())
+                                    {
+                                        <p><strong>Roles actuales:</strong> 
+                                            @foreach (var role in userRoles)
+                                            {
+                                                <span class="badge badge-info">@role</span>
+                                            }
+                                        </p>
+                                    }
+                                </div>
+                            }
+
+                            <div class="mt-4">
+                                <a asp-controller="Home" asp-action="Index" class="btn btn-default">
+                                    <i class="fas fa-arrow-left"></i> Volver al Inicio
+                                </a>
+                                <a asp-controller="Account" asp-action="Profile" class="btn btn-info">
+                                    <i class="fas fa-user"></i> Ver Mi Perfil
+                                </a>
+                                @if (isSuperAdmin)
+                                {
+                                    <a asp-controller="Institutions" asp-action="Index" class="btn btn-primary">
+                                        <i class="fas fa-building"></i> Gestionar Instituciones
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script>
+        // Log del acceso denegado en consola para debugging
+        console.warn('Access Denied:', {
+            returnUrl: '@returnUrl',
+            userRoles: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userRoles)),
+            isSuperAdmin: @isSuperAdmin.ToString().ToLower()
+        });
+    </script>
+}
+

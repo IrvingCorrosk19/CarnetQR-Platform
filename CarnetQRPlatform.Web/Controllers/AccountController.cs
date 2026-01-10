@@ -167,6 +167,27 @@ public class AccountController : Controller
     }
 
     [HttpGet]
+    [AllowAnonymous]
+    public IActionResult AccessDenied(string? returnUrl = null)
+    {
+        _logger.LogWarning("Access denied. User: {UserId}, ReturnUrl: {ReturnUrl}", 
+            User.Identity?.Name ?? "Anonymous", returnUrl);
+        
+        ViewData["ReturnUrl"] = returnUrl;
+        
+        // Si el usuario está autenticado, obtener sus roles
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            ViewData["UserRoles"] = User.Claims
+                .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+                .Select(c => c.Value)
+                .ToList();
+        }
+        
+        return View();
+    }
+
+    [HttpGet]
     [Authorize]
     public IActionResult ChangePassword()
     {
@@ -244,4 +265,3 @@ public class AccountController : Controller
         return RedirectToAction("Index", "Home");
     }
 }
-

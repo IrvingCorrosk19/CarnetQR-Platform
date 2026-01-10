@@ -147,8 +147,8 @@
                             </li>
                         }
 
-                        @* Configuración: Solo InstitutionAdmin y SuperAdmin *@
-                        @if (User.IsInRole("SuperAdmin") || User.IsInRole("InstitutionAdmin"))
+                        @* Configuración: Solo InstitutionAdmin (SuperAdmin usa el módulo de Instituciones) *@
+                        @if (User.IsInRole("InstitutionAdmin") && !User.IsInRole("SuperAdmin"))
                         {
                             <li class="nav-item">
                                 <a href="@Url.Action("Index", "InstitutionConfig")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "InstitutionConfig" ? "active" : "")">

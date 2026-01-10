@@ -11,7 +11,7 @@ using System.IO;
 
 namespace CarnetQRPlatform.Web.Controllers;
 
-[Authorize(Roles = Roles.InstitutionAdmin)]
+[Authorize] // Permitir acceso autenticado, validar rol en GetCurrentInstitutionAsync
 public class InstitutionConfigController : Controller
 {
     private readonly IInstitutionService _institutionService;
@@ -47,11 +47,12 @@ public class InstitutionConfigController : Controller
                 _logger.LogWarning("InstitutionConfig/Index: Institution not found. User: {UserId}, IsSuperAdmin: {IsSuperAdmin}", 
                     _userManager.GetUserId(User), _tenantProvider.IsSuperAdmin());
                 
-                // Si es SuperAdmin, redirigir con mensaje
+                // Si es SuperAdmin, redirigir a AccessDenied con mensaje claro
                 if (_tenantProvider.IsSuperAdmin())
                 {
-                    TempData["ErrorMessage"] = "Los SuperAdmin no pueden acceder a la configuración de institución. Use el módulo de Instituciones para gestionar instituciones.";
-                    return RedirectToAction("Index", "Home");
+                    _logger.LogWarning("SuperAdmin attempted to access InstitutionConfig. Redirecting to AccessDenied. User: {UserId}", 
+                        _userManager.GetUserId(User));
+                    return RedirectToAction("AccessDenied", "Account", new { returnUrl = Request.Path + Request.QueryString });
                 }
                 
                 // Si no tiene InstitutionId, mostrar mensaje más claro
@@ -459,9 +460,26 @@ public class InstitutionConfigController : Controller
             _logger.LogInformation("GetCurrentInstitutionAsync called. UserId: {UserId}", userId);
 
             // Si es SuperAdmin, no puede acceder a esta configuración (solo para InstitutionAdmin)
+            // Esto ya se maneja en Index, pero lo validamos aquí también para seguridad
             if (_tenantProvider.IsSuperAdmin())
             {
                 _logger.LogWarning("SuperAdmin attempted to access InstitutionConfig. User: {UserId}", userId);
+                return null;
+            }
+            
+            // Verificar que el usuario tenga rol InstitutionAdmin
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found in GetCurrentInstitutionAsync. UserId: {UserId}", userId);
+                return null;
+            }
+            
+            var userRoles = await _userManager.GetRolesAsync(user);
+            if (!userRoles.Contains(Roles.InstitutionAdmin))
+            {
+                _logger.LogWarning("User {UserId} does not have InstitutionAdmin role. Roles: {Roles}", 
+                    userId, string.Join(", ", userRoles));
                 return null;
             }
 
@@ -472,39 +490,38 @@ public class InstitutionConfigController : Controller
             if (!tenantId.HasValue)
             {
                 _logger.LogInformation("No tenantId in claims, trying to get from user entity...");
-                var user = await _userManager.GetUserAsync(User);
-                if (user != null)
+                // user ya fue obtenido arriba, reutilizar
+                if (user != null && user.InstitutionId.HasValue)
                 {
                     _logger.LogInformation("User found. InstitutionId in entity: {InstitutionId}", user.InstitutionId);
+                    tenantId = user.InstitutionId.Value;
                     
-                    if (user.InstitutionId.HasValue)
+                    // Agregar el claim si no existe
+                    var existingClaims = await _userManager.GetClaimsAsync(user);
+                    var institutionClaim = existingClaims.FirstOrDefault(c => c.Type == "InstitutionId");
+                    if (institutionClaim == null)
                     {
-                        tenantId = user.InstitutionId.Value;
-                        
-                        // Agregar el claim si no existe
-                        var existingClaims = await _userManager.GetClaimsAsync(user);
-                        var institutionClaim = existingClaims.FirstOrDefault(c => c.Type == "InstitutionId");
-                        if (institutionClaim == null)
-                        {
-                            _logger.LogInformation("Adding InstitutionId claim to user. InstitutionId: {InstitutionId}", tenantId.Value);
-                            await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("InstitutionId", tenantId.Value.ToString()));
-                            // Refrescar el sign-in para incluir el claim en la sesión actual
-                            await _signInManager.RefreshSignInAsync(user);
-                            _logger.LogInformation("Claim added and sign-in refreshed");
-                        }
-                        else
-                        {
-                            _logger.LogInformation("InstitutionId claim already exists: {ClaimValue}", institutionClaim.Value);
-                        }
+                        _logger.LogInformation("Adding InstitutionId claim to user. InstitutionId: {InstitutionId}", tenantId.Value);
+                        await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("InstitutionId", tenantId.Value.ToString()));
+                        // Refrescar el sign-in para incluir el claim en la sesión actual
+                        await _signInManager.RefreshSignInAsync(user);
+                        _logger.LogInformation("Claim added and sign-in refreshed");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("InstitutionId claim already exists: {ClaimValue}", institutionClaim.Value);
+                    }
+                }
+                else
+                {
+                    if (user == null)
+                    {
+                        _logger.LogWarning("User {UserId} not found in UserManager", userId);
                     }
                     else
                     {
                         _logger.LogWarning("User {UserId} does not have InstitutionId in entity", userId);
                     }
-                }
-                else
-                {
-                    _logger.LogWarning("User {UserId} not found in UserManager", userId);
                 }
             }
 
