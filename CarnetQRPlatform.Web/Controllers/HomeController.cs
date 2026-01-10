@@ -34,7 +34,7 @@ public class HomeController : Controller
             var isSuperAdmin = _tenantProvider.IsSuperAdmin();
             var tenantId = _tenantProvider.GetCurrentTenantId();
 
-            var model = new DashboardViewModel
+            var model = new HomeViewModel
             {
                 IsSuperAdmin = isSuperAdmin
             };
@@ -161,7 +161,7 @@ public class HomeController : Controller
         {
             _logger.LogError(ex, "Error loading dashboard data");
             // Retornar modelo vacío en caso de error para evitar crash
-            return View(new DashboardViewModel());
+            return View(new HomeViewModel());
         }
     }
 
