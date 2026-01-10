@@ -101,20 +101,17 @@
                 </div>
             </div>
             
-            @* Input de foto solo si PhotoEnabled está activo *@
-            @if (photoEnabled || isSuperAdmin)
-            {
-                <div class="row" id="photoSection" style="@(isSuperAdmin ? "display:none;" : "")">
-                    <div class="col-md-12">
-                        <div class="form-group mb-4">
-                            <label for="PhotoFile" class="form-label">Foto del Paciente</label>
-                            <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
-                            <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB</small>
-                            <span asp-validation-for="PhotoPath" class="text-danger"></span>
-                        </div>
+            @* Input de foto - SIEMPRE visible para permitir carga de imágenes *@
+            <div class="row" id="photoSection" style="@(isSuperAdmin ? "display:none;" : "")">
+                <div class="col-md-12">
+                    <div class="form-group mb-4">
+                        <label for="PhotoFile" class="form-label">Foto del Paciente <span class="text-muted">(Opcional)</span></label>
+                        <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                        <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB</small>
+                        <span asp-validation-for="PhotoPath" class="text-danger"></span>
                     </div>
                 </div>
-            }
+            </div>
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
@@ -134,29 +131,15 @@
             @if (isSuperAdmin && institutions != null)
             {
                 <text>
-                // Para SuperAdmin, actualizar PhotoEnabled según la institución seleccionada
+                // Para SuperAdmin, mostrar sección de foto cuando selecciona una institución
                 $('#InstitutionId').on('change', function() {
                     var institutionId = $(this).val();
                     if (institutionId) {
-                        // Hacer petición AJAX para obtener PhotoEnabled de la institución
-                        $.ajax({
-                            url: '@Url.Action("GetInstitutionPhotoEnabled", "Institutions")',
-                            type: 'GET',
-                            data: { id: institutionId },
-                            success: function(data) {
-                                if (data.photoEnabled) {
-                                    $('#photoSection').show();
-                                } else {
-                                    $('#photoSection').hide();
-                                    $('#PhotoFile').val('');
-                                }
-                            },
-                            error: function() {
-                                $('#photoSection').hide();
-                            }
-                        });
+                        // Siempre mostrar la sección de foto para permitir carga
+                        $('#photoSection').show();
                     } else {
                         $('#photoSection').hide();
+                        $('#PhotoFile').val('');
                     }
                 });
                 </text>

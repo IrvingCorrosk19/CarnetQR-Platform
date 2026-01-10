@@ -76,27 +76,24 @@
                 </div>
             </div>
             
-            @* Input de foto solo si PhotoEnabled está activo *@
-            @if (photoEnabled)
-            {
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="form-group mb-4">
-                            <label for="PhotoFile" class="form-label">Foto del Paciente</label>
-                            @if (!string.IsNullOrEmpty(Model.PhotoPath))
-                            {
-                                <div class="mb-2">
-                                    <img src="@Model.PhotoPath" alt="Foto actual" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
-                                    <p class="text-muted small mt-1">Foto actual</p>
-                                </div>
-                            }
-                            <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
-                            <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. Deje vacío para mantener la foto actual.</small>
-                            <span asp-validation-for="PhotoPath" class="text-danger"></span>
-                        </div>
+            @* Input de foto - SIEMPRE visible para permitir carga de imágenes *@
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="form-group mb-4">
+                        <label for="PhotoFile" class="form-label">Foto del Paciente <span class="text-muted">(Opcional)</span></label>
+                        @if (!string.IsNullOrEmpty(Model.PhotoPath))
+                        {
+                            <div class="mb-2">
+                                <img src="@Model.PhotoPath" alt="Foto actual" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                                <p class="text-muted small mt-1">Foto actual</p>
+                            </div>
+                        }
+                        <input type="file" name="PhotoFile" id="PhotoFile" class="form-control" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                        <small class="form-text text-muted">Formatos permitidos: JPG, JPEG, PNG, GIF. Tamaño máximo: 5MB. Deje vacío para mantener la foto actual.</small>
+                        <span asp-validation-for="PhotoPath" class="text-danger"></span>
                     </div>
                 </div>
-            }
+            </div>
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">

@@ -53,9 +53,6 @@ public class CarnetController : Controller
         // Generar QR en Base64
         var qrCodeBase64 = _qrCodeService.GenerateQrCodeBase64(qrUrl, size: 200);
 
-        // Construir ViewModel
-        var photoEnabled = card.Institution?.PhotoEnabled == true && !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath);
-        
         // Cargar template si existe (por defecto o específico vía query string)
         CardTemplate? template = null;
         if (Request.Query.ContainsKey("templateId"))
@@ -81,7 +78,18 @@ public class CarnetController : Controller
         }
 
         // Aplicar configuraciones de institución como fallback
-        config.ShowPhoto = photoEnabled;
+        // Mostrar foto si existe (independientemente de PhotoEnabled de la institución)
+        config.ShowPhoto = !string.IsNullOrEmpty(card.EntityProfile?.PhotoPath);
+        
+        // Configuración por defecto: foto en el frente, QR en la trasera
+        if (config.ShowPhoto)
+        {
+            // Por defecto: carnet de dos caras con foto en frente y QR en trasera
+            config.DoubleSided = true;
+            config.QrOnBack = true;
+            config.ShowQrCode = false; // No mostrar QR en el frente si está en la trasera
+        }
+        
         if (card.Institution != null)
         {
             config.ShowLogo = !string.IsNullOrEmpty(card.Institution.LogoPath);
@@ -116,6 +124,19 @@ public class CarnetController : Controller
 
         // Permitir override vía query string (sobrescribe configuraciones de template)
         ApplyQueryStringOverrides(viewModel.Config);
+        
+        // Asegurar coherencia: si QrOnBack está activo, el QR no debe mostrarse en el frente
+        if (viewModel.Config.QrOnBack)
+        {
+            viewModel.Config.DoubleSided = true;
+            viewModel.Config.ShowQrCode = false;
+        }
+        
+        // Si hay foto disponible, asegurar que se muestre
+        if (!string.IsNullOrEmpty(viewModel.PhotoPath))
+        {
+            viewModel.Config.ShowPhoto = true;
+        }
 
         return View("PrintCarnet", viewModel);
     }

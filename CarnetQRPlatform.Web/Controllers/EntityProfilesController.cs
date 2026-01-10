@@ -153,56 +153,53 @@ public class EntityProfilesController : Controller
                 }
             }
             
-            // Manejar upload de foto si PhotoEnabled está activo
-            if (institution != null && institution.PhotoEnabled)
+            // Manejar upload de foto - SIEMPRE permitido (no depende de PhotoEnabled)
+            var photoFile = Request.Form.Files["PhotoFile"];
+            if (photoFile != null && photoFile.Length > 0)
             {
-                var photoFile = Request.Form.Files["PhotoFile"];
-                if (photoFile != null && photoFile.Length > 0)
+                // Validar tipo de archivo
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                var extension = Path.GetExtension(photoFile.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(extension))
                 {
-                    // Validar tipo de archivo
-                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-                    var extension = Path.GetExtension(photoFile.FileName).ToLowerInvariant();
-                    if (!allowedExtensions.Contains(extension))
+                    ModelState.AddModelError("PhotoFile", "Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).");
+                }
+                else
+                {
+                    // Validar tamaño (máximo 5MB)
+                    if (photoFile.Length > 5 * 1024 * 1024)
                     {
-                        ModelState.AddModelError("PhotoFile", "Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).");
+                        ModelState.AddModelError("PhotoFile", "El archivo no puede exceder 5MB.");
                     }
                     else
                     {
-                        // Validar tamaño (máximo 5MB)
-                        if (photoFile.Length > 5 * 1024 * 1024)
+                        // Validar magic bytes para seguridad adicional
+                        var isValidImage = await ValidateImageFile(photoFile);
+                        if (!isValidImage)
                         {
-                            ModelState.AddModelError("PhotoFile", "El archivo no puede exceder 5MB.");
+                            ModelState.AddModelError("PhotoFile", "El archivo no es una imagen válida.");
                         }
                         else
                         {
-                            // Validar magic bytes para seguridad adicional
-                            var isValidImage = await ValidateImageFile(photoFile);
-                            if (!isValidImage)
+                            // Crear directorio si no existe
+                            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "photos");
+                            if (!Directory.Exists(uploadsDir))
                             {
-                                ModelState.AddModelError("PhotoFile", "El archivo no es una imagen válida.");
+                                Directory.CreateDirectory(uploadsDir);
                             }
-                            else
+
+                            // Generar nombre único
+                            var fileName = $"{Guid.NewGuid()}{extension}";
+                            var filePath = Path.Combine(uploadsDir, fileName);
+                            var relativePath = $"/uploads/photos/{fileName}";
+
+                            // Guardar archivo
+                            using (var stream = new FileStream(filePath, FileMode.Create))
                             {
-                                // Crear directorio si no existe
-                                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "photos");
-                                if (!Directory.Exists(uploadsDir))
-                                {
-                                    Directory.CreateDirectory(uploadsDir);
-                                }
-
-                                // Generar nombre único
-                                var fileName = $"{Guid.NewGuid()}{extension}";
-                                var filePath = Path.Combine(uploadsDir, fileName);
-                                var relativePath = $"/uploads/photos/{fileName}";
-
-                                // Guardar archivo
-                                using (var stream = new FileStream(filePath, FileMode.Create))
-                                {
-                                    await photoFile.CopyToAsync(stream);
-                                }
-
-                                entityProfile.PhotoPath = relativePath;
+                                await photoFile.CopyToAsync(stream);
                             }
+
+                            entityProfile.PhotoPath = relativePath;
                         }
                     }
                 }
@@ -288,69 +285,63 @@ public class EntityProfilesController : Controller
         ModelState.Remove(nameof(entityProfile.InstitutionId));
         ModelState.Remove(nameof(entityProfile.PhotoPath)); // PhotoPath se maneja por separado
         
-        // Obtener institución para verificar PhotoEnabled
-        var institution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
-        
-        // Manejar upload de foto si PhotoEnabled está activo
-        if (institution != null && institution.PhotoEnabled)
+        // Manejar upload de foto - SIEMPRE permitido (no depende de PhotoEnabled)
+        var photoFile = Request.Form.Files["PhotoFile"];
+        if (photoFile != null && photoFile.Length > 0)
         {
-            var photoFile = Request.Form.Files["PhotoFile"];
-            if (photoFile != null && photoFile.Length > 0)
+            // Validar tipo de archivo
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+            var extension = Path.GetExtension(photoFile.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension))
             {
-                // Validar tipo de archivo
-                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-                var extension = Path.GetExtension(photoFile.FileName).ToLowerInvariant();
-                if (!allowedExtensions.Contains(extension))
+                ModelState.AddModelError("PhotoFile", "Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).");
+            }
+            else
+            {
+                // Validar tamaño (máximo 5MB)
+                if (photoFile.Length > 5 * 1024 * 1024)
                 {
-                    ModelState.AddModelError("PhotoFile", "Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).");
+                    ModelState.AddModelError("PhotoFile", "El archivo no puede exceder 5MB.");
                 }
                 else
                 {
-                    // Validar tamaño (máximo 5MB)
-                    if (photoFile.Length > 5 * 1024 * 1024)
+                    // Validar magic bytes para seguridad adicional
+                    var isValidImage = await ValidateImageFile(photoFile);
+                    if (!isValidImage)
                     {
-                        ModelState.AddModelError("PhotoFile", "El archivo no puede exceder 5MB.");
+                        ModelState.AddModelError("PhotoFile", "El archivo no es una imagen válida.");
                     }
                     else
                     {
-                        // Validar magic bytes para seguridad adicional
-                        var isValidImage = await ValidateImageFile(photoFile);
-                        if (!isValidImage)
+                        // Crear directorio si no existe
+                        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "photos");
+                        if (!Directory.Exists(uploadsDir))
                         {
-                            ModelState.AddModelError("PhotoFile", "El archivo no es una imagen válida.");
+                            Directory.CreateDirectory(uploadsDir);
                         }
-                        else
+
+                        // Generar nombre único
+                        var fileName = $"{Guid.NewGuid()}{extension}";
+                        var filePath = Path.Combine(uploadsDir, fileName);
+                        var relativePath = $"/uploads/photos/{fileName}";
+
+                        // Guardar archivo
+                        using (var stream = new FileStream(filePath, FileMode.Create))
                         {
-                            // Crear directorio si no existe
-                            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "photos");
-                            if (!Directory.Exists(uploadsDir))
-                            {
-                                Directory.CreateDirectory(uploadsDir);
-                            }
-
-                            // Generar nombre único
-                            var fileName = $"{Guid.NewGuid()}{extension}";
-                            var filePath = Path.Combine(uploadsDir, fileName);
-                            var relativePath = $"/uploads/photos/{fileName}";
-
-                            // Guardar archivo
-                            using (var stream = new FileStream(filePath, FileMode.Create))
-                            {
-                                await photoFile.CopyToAsync(stream);
-                            }
-
-                            // Eliminar foto anterior si existe
-                            if (!string.IsNullOrEmpty(entityProfile.PhotoPath) && entityProfile.PhotoPath.StartsWith("/uploads/photos/"))
-                            {
-                                var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", entityProfile.PhotoPath.TrimStart('/'));
-                                if (System.IO.File.Exists(oldFilePath))
-                                {
-                                    System.IO.File.Delete(oldFilePath);
-                                }
-                            }
-
-                            entityProfile.PhotoPath = relativePath;
+                            await photoFile.CopyToAsync(stream);
                         }
+
+                        // Eliminar foto anterior si existe
+                        if (!string.IsNullOrEmpty(entityProfile.PhotoPath) && entityProfile.PhotoPath.StartsWith("/uploads/photos/"))
+                        {
+                            var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", entityProfile.PhotoPath.TrimStart('/'));
+                            if (System.IO.File.Exists(oldFilePath))
+                            {
+                                System.IO.File.Delete(oldFilePath);
+                            }
+                        }
+
+                        entityProfile.PhotoPath = relativePath;
                     }
                 }
             }

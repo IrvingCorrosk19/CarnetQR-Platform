@@ -35,8 +35,8 @@ public class PrintCardConfig
     public string Orientation { get; set; } = "horizontal"; // horizontal | vertical
     
     // ==================== DOS CARAS ====================
-    public bool DoubleSided { get; set; } = false; // Impresión de dos caras (frente/trasera)
-    public bool QrOnBack { get; set; } = false; // QR en la parte trasera (requiere DoubleSided = true)
+    public bool DoubleSided { get; set; } = true; // Impresión de dos caras (frente/trasera) - Por defecto activado
+    public bool QrOnBack { get; set; } = true; // QR en la parte trasera (requiere DoubleSided = true) - Por defecto activado
     public bool BackRotate180 { get; set; } = false; // Rotar 180° la trasera para impresoras de dos caras
     
     // ==================== COLORES Y ESTILOS ====================
@@ -81,8 +81,8 @@ public class PrintCardConfig
     public bool ShowInstitutionName { get; set; } = true;
     public bool ShowUserName { get; set; } = true;
     public bool ShowCardNumber { get; set; } = true;
-    public bool ShowQrCode { get; set; } = true; // Si QrOnBack = true, no se muestra en el frente
-    public bool ShowPhoto { get; set; } = false;
+    public bool ShowQrCode { get; set; } = false; // Por defecto no se muestra en el frente (va en la trasera)
+    public bool ShowPhoto { get; set; } = true; // Por defecto mostrar foto si existe
     public bool ShowIdentificationNumber { get; set; } = false;
     public bool ShowEmail { get; set; } = false;
     public bool ShowPhone { get; set; } = false;

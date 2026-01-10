@@ -500,11 +500,24 @@
             font-weight: 600;
         }
 
-        /* Estilos para impresión */
+        /* Estilos para impresión - Mejorados */
         @@media print {
+            @@page {
+                size: @(width)mm @(height)mm;
+                margin: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
             body {
-                background: white;
-                padding: 0;
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
                 display: block;
             }
 
@@ -518,31 +531,20 @@
 
             .carnet-container {
                 margin: 0 !important;
+                page-break-inside: avoid;
                 @if (!config.ShowShadow) {
-                    <text>box-shadow: none;</text>
+                    <text>box-shadow: none !important;</text>
                 }
-                border: @config.BorderWidth mm @config.BorderStyle @config.BorderColor;
-                page-break-after: @(config.DoubleSided ? "always" : "auto");
+                border: @config.BorderWidth mm @config.BorderStyle @config.BorderColor !important;
             }
 
             .carnet-container-back {
                 margin: 0 !important;
+                page-break-inside: avoid;
                 @if (!config.ShowShadow) {
-                    <text>box-shadow: none;</text>
+                    <text>box-shadow: none !important;</text>
                 }
-                border: @config.BorderWidth mm @config.BorderStyle @config.BorderColor;
-                page-break-after: always;
-                page-break-before: always;
-            }
-
-            @@page {
-                size: @(width)mm @(height)mm;
-                margin: 0;
-            }
-
-            body {
-                margin: 0;
-                padding: 0;
+                border: @config.BorderWidth mm @config.BorderStyle @config.BorderColor !important;
             }
 
             /* Para impresión de dos caras - cada cara en su propia página */
@@ -550,11 +552,13 @@
                 <text>
                 .carnet-container {
                     page-break-after: always;
+                    page-break-inside: avoid;
                 }
                 
                 .carnet-container-back {
                     page-break-before: always;
                     page-break-after: always;
+                    page-break-inside: avoid;
                 }
                 </text>
                 
@@ -562,13 +566,31 @@
                     <text>
                     .carnet-container-back {
                         transform: rotate(180deg);
+                        -webkit-transform: rotate(180deg);
+                        -moz-transform: rotate(180deg);
+                        -ms-transform: rotate(180deg);
                     }
                     
                     .carnet-back-content {
                         transform: rotate(180deg);
+                        -webkit-transform: rotate(180deg);
+                        -moz-transform: rotate(180deg);
+                        -ms-transform: rotate(180deg);
                     }
                     </text>
                 }
+            }
+
+            /* Mejorar calidad de imágenes en impresión */
+            .carnet-photo img,
+            .carnet-qr img,
+            .carnet-back-qr img,
+            .carnet-logo {
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: crisp-edges;
+                image-rendering: optimizeQuality;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
         }
 
