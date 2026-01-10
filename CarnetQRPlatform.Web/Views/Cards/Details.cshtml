@@ -93,9 +93,23 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6 text-center">
-                                    @if (!string.IsNullOrEmpty(qrCodeBase64))
+                                    @* Mostrar foto si existe, si no mostrar QR *@
+                                    @if (!string.IsNullOrEmpty(Model.EntityProfile?.PhotoPath))
+                                    {
+                                        <img src="@Model.EntityProfile.PhotoPath" alt="Foto del Paciente" style="max-width: 150px; max-height: 180px; border: 2px solid #dee2e6; border-radius: 8px; padding: 5px; background: white; object-fit: cover;">
+                                        <p class="text-muted small mt-2 mb-0">Foto del Paciente</p>
+                                    }
+                                    else if (!string.IsNullOrEmpty(qrCodeBase64))
                                     {
                                         <img src="@qrCodeBase64" alt="Código QR" style="max-width: 200px; border: 2px solid #dee2e6; border-radius: 8px; padding: 8px; background: white;">
+                                        <p class="text-muted small mt-2 mb-0">Código QR (sin foto)</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted p-4 border rounded">
+                                            <i class="fas fa-image fa-3x mb-2"></i>
+                                            <p class="small mb-0">Sin imagen disponible</p>
+                                        </div>
                                     }
                                 </div>
                             </div>
@@ -193,6 +207,17 @@
                                     </div>
                                     
                                     <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showPhoto" @if (!string.IsNullOrEmpty(Model.EntityProfile?.PhotoPath)) { <text>checked</text> }>
+                                        <label class="form-check-label" for="showPhoto">
+                                            <i class="fas fa-camera me-1"></i>Mostrar Foto del Paciente
+                                        </label>
+                                        @if (string.IsNullOrEmpty(Model.EntityProfile?.PhotoPath))
+                                        {
+                                            <small class="text-muted d-block ms-4">(No hay foto disponible para este carnet)</small>
+                                        }
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" id="showQrCode" checked>
                                         <label class="form-check-label" for="showQrCode">
                                             Mostrar Código QR
@@ -261,10 +286,15 @@
             var showInstitutionName = document.getElementById('showInstitutionName').checked;
             var showUserName = document.getElementById('showUserName').checked;
             var showCardNumber = document.getElementById('showCardNumber').checked;
+            var showPhoto = document.getElementById('showPhoto').checked;
             var showQrCode = document.getElementById('showQrCode').checked;
             var showIdentificationNumber = document.getElementById('showIdentificationNumber').checked;
             var showEmail = document.getElementById('showEmail').checked;
             var showPhone = document.getElementById('showPhone').checked;
+            
+            // Si showPhoto está marcado, configurar para que QR vaya en la trasera
+            var qrOnBack = showPhoto && showQrCode;
+            var doubleSided = qrOnBack;
             
             var url = '@Url.Action("Print", "Carnet", new { cardNumber = Model.CardNumber })' +
                 '?width=' + width +
@@ -274,10 +304,13 @@
                 '&showInstitutionName=' + showInstitutionName +
                 '&showUserName=' + showUserName +
                 '&showCardNumber=' + showCardNumber +
+                '&showPhoto=' + showPhoto +
                 '&showQrCode=' + showQrCode +
                 '&showIdentificationNumber=' + showIdentificationNumber +
                 '&showEmail=' + showEmail +
-                '&showPhone=' + showPhone;
+                '&showPhone=' + showPhone +
+                '&qrOnBack=' + qrOnBack +
+                '&doubleSided=' + doubleSided;
             
             window.open(url, '_blank');
             
