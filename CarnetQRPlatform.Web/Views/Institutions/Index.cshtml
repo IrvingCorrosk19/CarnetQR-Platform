@@ -54,7 +54,7 @@
                             }
                         </td>
                         <td>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 flex-wrap">
                                 <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
                                     <i class="fas fa-edit me-1"></i> Editar
                                 </a>
@@ -65,6 +65,9 @@
                                         @(item.IsActive ? "Desactivar" : "Activar")
                                     </button>
                                 </form>
+                                <button type="button" class="btn btn-danger btn-sm delete-institution-btn" data-id="@item.Id" data-name="@item.Name" title="Eliminar">
+                                    <i class="fas fa-trash me-1"></i> Eliminar
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -75,6 +78,7 @@
 </div>
 
 @section Scripts {
+    @Html.AntiForgeryToken()
     <script>
         $(document).ready(function () {
             $('#institutionsTable').DataTable({
@@ -93,6 +97,74 @@
                     successMessage: 'Estado actualizado exitosamente',
                     successCallback: function() {
                         location.reload();
+                    }
+                });
+            });
+
+            // Manejar eliminación de instituciones
+            $(document).on('click', '.delete-institution-btn', function() {
+                var institutionId = $(this).data('id');
+                var institutionName = $(this).data('name');
+                
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    html: `¿Deseas eliminar la institución <strong>${institutionName}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    showLoaderOnConfirm: true,
+                    preConfirm: function() {
+                        return new Promise(function(resolve, reject) {
+                            var token = $('input[name="__RequestVerificationToken"]').val();
+                            
+                            $.ajax({
+                                url: '@Url.Action("Delete", "Institutions")',
+                                type: 'POST',
+                                data: {
+                                    id: institutionId,
+                                    __RequestVerificationToken: token
+                                },
+                                success: function(response) {
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: '¡Eliminado!',
+                                            text: response.message || 'Institución eliminada exitosamente.',
+                                            timer: 2000,
+                                            showConfirmButton: false
+                                        }).then(function() {
+                                            if (response.redirectUrl) {
+                                                window.location.href = response.redirectUrl;
+                                            } else {
+                                                window.location.reload();
+                                            }
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: response.message || 'No se pudo eliminar la institución.'
+                                        });
+                                    }
+                                    resolve();
+                                },
+                                error: function(xhr) {
+                                    var errorMsg = 'Ocurrió un error al eliminar la institución.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errorMsg = xhr.responseJSON.message;
+                                    }
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: errorMsg
+                                    });
+                                    resolve();
+                                }
+                            });
+                        });
                     }
                 });
             });
