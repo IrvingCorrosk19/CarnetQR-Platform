@@ -23,6 +23,9 @@ public static class DbInitializer
             await SeedRolesAsync(roleManager);
             logger?.LogInformation("Roles seeded.");
             
+            await SeedInstitutionTypesAsync(context, logger);
+            logger?.LogInformation("Institution types seeded.");
+            
             await SeedSuperAdminAsync(context, userManager, logger);
             await SeedDemoInstitutionAsync(context, userManager, logger);
             
@@ -135,7 +138,7 @@ public static class DbInitializer
                 Name = "Empresa Demo",
                 Description = "Empresa de demostración",
                 CardPrefix = "DEMO",
-                InstitutionType = InstitutionType.Clinica,
+                InstitutionTypeId = null, // Se asignará después de crear los tipos
                 IsActive = true
             };
 
@@ -202,6 +205,36 @@ public static class DbInitializer
                     logger?.LogWarning(ex, "Could not initialize default card templates for existing demo institution: {Message}", ex.Message);
                 }
             }
+        }
+    }
+
+    private static async Task SeedInstitutionTypesAsync(ApplicationDbContext context, ILogger? logger)
+    {
+        if (!await context.InstitutionTypes.AnyAsync())
+        {
+            var types = new[]
+            {
+                new Domain.Entities.InstitutionType
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Clínica",
+                    Description = "Institución de salud de atención ambulatoria",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new Domain.Entities.InstitutionType
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Hospital",
+                    Description = "Institución de salud con servicios de internamiento",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+
+            await context.InstitutionTypes.AddRangeAsync(types);
+            await context.SaveChangesAsync();
+            logger?.LogInformation("Seeded {Count} institution types.", types.Length);
         }
     }
 }

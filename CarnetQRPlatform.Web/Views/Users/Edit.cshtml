@@ -1,0 +1,160 @@
+@model CarnetQRPlatform.Web.Models.EditUserViewModel
+@using CarnetQRPlatform.Domain.Constants
+@{
+    ViewData["Title"] = "Editar Usuario";
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+    var availableRoles = ViewBag.AvailableRoles as string[];
+    var isSuperAdmin = ViewBag.IsSuperAdmin as bool? ?? User.IsInRole(Roles.SuperAdmin);
+    var institutionId = ViewBag.InstitutionId as Guid?;
+    var institutionName = ViewBag.InstitutionName as string;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-user-edit me-2"></i>
+            Editar Usuario
+        </h3>
+    </div>
+    <form asp-action="Edit" method="post" id="editUserForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Email" class="form-label">Correo Electrónico <span class="text-danger">*</span></label>
+                        <input asp-for="Email" type="email" class="form-control" placeholder="usuario@ejemplo.com" required />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Role" class="form-label">Rol <span class="text-danger">*</span></label>
+                        <select asp-for="Role" class="form-select" id="roleSelect" required>
+                            <option value="">-- Seleccione un rol --</option>
+                            @if (availableRoles != null)
+                            {
+                                @foreach (var role in availableRoles)
+                                {
+                                    <option value="@role" selected="@(Model.Role == role)">@role</option>
+                                }
+                            }
+                        </select>
+                        <span asp-validation-for="Role" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="FirstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input asp-for="FirstName" class="form-control" placeholder="Ingrese el nombre" required />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="LastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input asp-for="LastName" class="form-control" placeholder="Ingrese el apellido" required />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+            
+            @if (isSuperAdmin)
+            {
+                <div class="row" id="institutionRow">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label asp-for="InstitutionId" class="form-label">Empresa</label>
+                            <select asp-for="InstitutionId" class="form-select" id="institutionSelect">
+                                <option value="">-- Seleccione una empresa --</option>
+                                @if (institutions != null)
+                                {
+                                    @foreach (var institution in institutions)
+                                    {
+                                        <option value="@institution.Id" selected="@(Model.InstitutionId == institution.Id)">@institution.Name</option>
+                                    }
+                                }
+                            </select>
+                            <span asp-validation-for="InstitutionId" class="text-danger"></span>
+                            <small class="form-text text-muted">El usuario será asignado a esta empresa y solo podrá gestionar sus datos.</small>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @if (institutionId.HasValue)
+                {
+                    <input type="hidden" asp-for="InstitutionId" value="@institutionId.Value" />
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group mb-4">
+                                <label class="form-label">Empresa</label>
+                                <input type="text" class="form-control" value="@institutionName" readonly />
+                                <small class="form-text text-muted">El usuario está asignado a su institución.</small>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="form-group mb-4">
+                <div class="form-check">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                    <label asp-for="IsActive" class="form-check-label">Usuario Activo</label>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            @if (isSuperAdmin)
+            {
+                <text>
+                // Mostrar/ocultar selector de empresa según el rol
+                $('#roleSelect').on('change', function() {
+                    var role = $(this).val();
+                    if (role === 'SuperAdmin') {
+                        $('#institutionRow').hide();
+                        $('#institutionSelect').val('').removeAttr('required');
+                    } else {
+                        $('#institutionRow').show();
+                        $('#institutionSelect').attr('required', 'required');
+                    }
+                });
+
+                // Trigger inicial
+                $('#roleSelect').trigger('change');
+                </text>
+            }
+
+            $('#editUserForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Actualizando usuario...',
+                    successMessage: 'Usuario actualizado exitosamente',
+                    redirectUrl: '@Url.Action("Index", "Users")'
+                });
+            });
+        });
+    </script>
+}
+

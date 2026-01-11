@@ -261,6 +261,13 @@ public class EntityProfilesController : Controller
             return NotFound();
         }
 
+        // Si es SuperAdmin, cargar lista de instituciones para seleccionar
+        if (User.IsInRole(Roles.SuperAdmin))
+        {
+            var institutions = await _institutionService.GetAllAsync();
+            ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+        }
+
         // Obtener institución para verificar PhotoEnabled
         var institution = await _institutionService.GetByIdAsync(entity.InstitutionId);
         ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
@@ -292,8 +299,51 @@ public class EntityProfilesController : Controller
             return NotFound();
         }
 
-        // InstitutionId ya está establecido desde el modelo cargado, no necesita validación
+        // Remover InstitutionId del ModelState para evitar validación automática
+        // Lo validaremos manualmente según el rol
         ModelState.Remove(nameof(entityProfile.InstitutionId));
+        
+        // Si es SuperAdmin, validar que haya seleccionado una institución
+        if (User.IsInRole(Roles.SuperAdmin))
+        {
+            if (entityProfile.InstitutionId == Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(entityProfile.InstitutionId), "Debe seleccionar una empresa.");
+                
+                // Recargar instituciones para el dropdown
+                var institutions = await _institutionService.GetAllAsync();
+                ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+                
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Debe seleccionar una empresa." });
+                }
+                return View(entityProfile);
+            }
+            
+            // Validar que la institución existe y está activa
+            var selectedInstitution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
+            if (selectedInstitution == null || !selectedInstitution.IsActive)
+            {
+                ModelState.AddModelError(nameof(entityProfile.InstitutionId), "La empresa seleccionada no existe o está inactiva.");
+                
+                var institutions = await _institutionService.GetAllAsync();
+                ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+                
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "La empresa seleccionada no existe o está inactiva." });
+                }
+                return View(entityProfile);
+            }
+        }
+        else
+        {
+            // InstitutionId se establece automáticamente desde el tenant
+            // Preservar InstitutionId del modelo existente
+            entityProfile.InstitutionId = existingEntity.InstitutionId;
+        }
+        
         ModelState.Remove(nameof(entityProfile.PhotoPath)); // PhotoPath se maneja por separado
         
         // Preservar PhotoPath existente por defecto
@@ -384,6 +434,12 @@ public class EntityProfilesController : Controller
         if (!ModelState.IsValid)
         {
             // Si hay errores, recargar ViewBag necesario para la vista
+            if (User.IsInRole(Roles.SuperAdmin))
+            {
+                var institutions = await _institutionService.GetAllAsync();
+                ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            }
+            
             var institution = await _institutionService.GetByIdAsync(existingEntity.InstitutionId);
             ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
             

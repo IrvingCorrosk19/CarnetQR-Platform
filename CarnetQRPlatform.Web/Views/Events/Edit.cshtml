@@ -1,0 +1,144 @@
+@model CarnetQRPlatform.Domain.Entities.EventRecord
+@using CarnetQRPlatform.Domain.Constants
+@{
+    ViewData["Title"] = "Editar Evento";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+    var entityProfiles = ViewBag.EntityProfiles as IEnumerable<CarnetQRPlatform.Domain.Entities.EntityProfile>;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-calendar-edit me-2"></i>
+            Editar Evento
+        </h3>
+    </div>
+    <form asp-action="Edit" method="post" id="editEventForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Solo se pueden editar eventos programados. Los eventos completados no pueden modificarse.
+            </div>
+
+            @* Selector de institución solo para SuperAdmin *@
+            @if (isSuperAdmin && institutions != null && institutions.Any())
+            {
+                <div class="form-group mb-4">
+                    <label for="InstitutionFilter" class="form-label">Empresa</label>
+                    <select id="InstitutionFilter" class="form-select">
+                        <option value="">-- Todas las empresas --</option>
+                        @foreach (var institution in institutions)
+                        {
+                            <option value="@institution.Id" selected="@(Model.InstitutionId == institution.Id)">@institution.Name</option>
+                        }
+                    </select>
+                    <small class="form-text text-muted">Seleccione una empresa para filtrar las entidades.</small>
+                </div>
+            }
+
+            <div class="form-group mb-4">
+                <label asp-for="EntityProfileId" class="form-label">Entidad <span class="text-danger">*</span></label>
+                <select asp-for="EntityProfileId" class="form-select" id="EntityProfileId" required>
+                    <option value="">-- Seleccione una entidad --</option>
+                    @if (entityProfiles != null)
+                    {
+                        @foreach (var entity in entityProfiles)
+                        {
+                            <option value="@entity.Id" data-institution-id="@entity.InstitutionId" selected="@(Model.EntityProfileId == entity.Id)">
+                                @($"{entity.FirstName} {entity.LastName}")@(!string.IsNullOrEmpty(entity.IdentificationNumber) ? $" - {entity.IdentificationNumber}" : "")
+                            </option>
+                        }
+                    }
+                </select>
+                <span asp-validation-for="EntityProfileId" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="ScheduledAt" class="form-label">Fecha y Hora Programada <span class="text-danger">*</span></label>
+                <input asp-for="ScheduledAt" type="datetime-local" class="form-control" required />
+                <span asp-validation-for="ScheduledAt" class="text-danger"></span>
+                <small class="form-text text-muted">Seleccione la fecha y hora en que se realizará el evento.</small>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="Notes" class="form-label">Notas</label>
+                <textarea asp-for="Notes" class="form-control" rows="4" placeholder="Información adicional sobre el evento"></textarea>
+                <span asp-validation-for="Notes" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="form-label">Estado</label>
+                <input type="text" class="form-control" value="@Model.Status" readonly />
+                <small class="form-text text-muted">El estado no se puede cambiar desde esta vista. Use el botón de acciones en la lista para cambiar el estado.</small>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            @if (isSuperAdmin)
+            {
+                <text>
+                // Filtrar entidades por institución para SuperAdmin
+                $('#InstitutionFilter').on('change', function() {
+                    var selectedInstitutionId = $(this).val();
+                    var $entitySelect = $('#EntityProfileId');
+                    var currentValue = $entitySelect.val();
+                    
+                    if (selectedInstitutionId) {
+                        // Filtrar opciones por institución
+                        $entitySelect.find('option').each(function() {
+                            var $option = $(this);
+                            var institutionId = $option.data('institution-id');
+                            
+                            if ($option.val() === '') {
+                                // Mantener la opción por defecto
+                                $option.show();
+                            } else if (institutionId === selectedInstitutionId) {
+                                $option.show();
+                            } else {
+                                $option.hide();
+                            }
+                        });
+                    } else {
+                        // Mostrar todas las opciones
+                        $entitySelect.find('option').show();
+                    }
+                    
+                    // Si la entidad seleccionada no coincide con el filtro, limpiar selección
+                    var selectedOption = $entitySelect.find('option:selected');
+                    if (selectedInstitutionId && selectedOption.data('institution-id') !== selectedInstitutionId) {
+                        $entitySelect.val('');
+                    }
+                });
+                </text>
+            }
+            
+            $('#editEventForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Actualizando evento...',
+                    successMessage: 'Evento actualizado exitosamente',
+                    redirectUrl: '@Url.Action("Index", "Events")'
+                });
+            });
+        });
+    </script>
+}
+

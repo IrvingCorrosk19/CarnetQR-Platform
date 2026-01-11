@@ -49,6 +49,7 @@ public static class DependencyInjection
 
         // Application Services
         services.AddScoped<Application.Services.IInstitutionService, Infrastructure.Services.InstitutionService>();
+        services.AddScoped<Application.Services.IInstitutionTypeService, Infrastructure.Services.InstitutionTypeService>();
         services.AddScoped<Application.Services.IEntityProfileService, Infrastructure.Services.EntityProfileService>();
         services.AddScoped<Application.Services.ICardService, Infrastructure.Services.CardService>();
         services.AddScoped<Application.Services.IEventService, Infrastructure.Services.EventService>();

@@ -14,17 +14,20 @@ namespace CarnetQRPlatform.Web.Controllers;
 public class InstitutionsController : Controller
 {
     private readonly IInstitutionService _institutionService;
+    private readonly IInstitutionTypeService _institutionTypeService;
     private readonly UserManager<AppUser> _userManager;
     private readonly IAuditService _auditService;
     private readonly ILogger<InstitutionsController> _logger;
 
     public InstitutionsController(
         IInstitutionService institutionService,
+        IInstitutionTypeService institutionTypeService,
         UserManager<AppUser> userManager,
         IAuditService auditService,
         ILogger<InstitutionsController> logger)
     {
         _institutionService = institutionService;
+        _institutionTypeService = institutionTypeService;
         _userManager = userManager;
         _auditService = auditService;
         _logger = logger;
@@ -36,8 +39,10 @@ public class InstitutionsController : Controller
         return View(institutions);
     }
 
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
+        var institutionTypes = await _institutionTypeService.GetAllAsync();
+        ViewBag.InstitutionTypes = institutionTypes.Where(it => it.IsActive).OrderBy(it => it.Name).ToList();
         return View(new Models.CreateInstitutionViewModel());
     }
 
@@ -57,6 +62,23 @@ public class InstitutionsController : Controller
 
         try
         {
+            // Validar que el tipo de institución existe
+            if (model.InstitutionTypeId.HasValue)
+            {
+                var institutionType = await _institutionTypeService.GetByIdAsync(model.InstitutionTypeId.Value);
+                if (institutionType == null || !institutionType.IsActive)
+                {
+                    ModelState.AddModelError(nameof(model.InstitutionTypeId), "El tipo de institución seleccionado no existe o está inactivo.");
+                    var institutionTypes = await _institutionTypeService.GetAllAsync();
+                    ViewBag.InstitutionTypes = institutionTypes.Where(it => it.IsActive).OrderBy(it => it.Name).ToList();
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                    {
+                        return Json(new { success = false, message = "El tipo de institución seleccionado no existe o está inactivo." });
+                    }
+                    return View(model);
+                }
+            }
+
             // Crear la institución
             var institution = new Institution
             {
@@ -66,7 +88,7 @@ public class InstitutionsController : Controller
                 Phone = model.Phone,
                 Address = model.Address,
                 CardPrefix = model.CardPrefix,
-                InstitutionType = model.InstitutionType,
+                InstitutionTypeId = model.InstitutionTypeId,
                 IsActive = true
             };
 
@@ -210,6 +232,9 @@ public class InstitutionsController : Controller
             return NotFound();
         }
 
+        var institutionTypes = await _institutionTypeService.GetAllAsync();
+        ViewBag.InstitutionTypes = institutionTypes.Where(it => it.IsActive).OrderBy(it => it.Name).ToList();
+        
         return View(institution);
     }
 

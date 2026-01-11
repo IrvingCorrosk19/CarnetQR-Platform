@@ -9,6 +9,11 @@
             <i class="fas fa-id-card me-2"></i>
             Gestión de Carnets
         </h3>
+        <div class="card-tools">
+            <a asp-action="Create" class="btn btn-light btn-sm">
+                <i class="fas fa-plus"></i> Nuevo Carnet
+            </a>
+        </div>
     </div>
     <div class="card-body">
         <table id="cardsTable" class="table table-bordered table-striped">
@@ -25,7 +30,7 @@
                         <td>@item.IssuedAt.ToString("dd/MM/yyyy")</td>
                         <td><span class="badge bg-@(item.IsActive ? "success" : "secondary")">@(item.IsActive ? "Activo" : "Inactivo")</span></td>
                         <td>
-                            <div class="btn-group" role="group">
+                            <div class="d-flex gap-2 flex-wrap">
                                 <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm" title="Ver detalles">
                                     <i class="fas fa-eye me-1"></i> Ver
                                 </a>
@@ -36,6 +41,9 @@
                                         @(item.IsActive ? "Desactivar" : "Activar")
                                     </button>
                                 </form>
+                                <button type="button" class="btn btn-danger btn-sm delete-card-btn" data-id="@item.Id" data-number="@item.CardNumber" title="Eliminar">
+                                    <i class="fas fa-trash me-1"></i> Eliminar
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -45,6 +53,7 @@
     </div>
 </div>
 @section Scripts {
+    @Html.AntiForgeryToken()
     <script>
         $(document).ready(function () {
             $('#cardsTable').DataTable({
@@ -57,22 +66,30 @@
             $(document).on('submit', '.form-toggle-active', function(e) {
                 e.preventDefault();
                 var form = $(this);
-                var button = form.find('button[type="submit"]');
-                var originalText = button.html();
+                var submitBtn = form.find('button[type="submit"]');
+                var originalText = submitBtn.html();
                 
-                // Deshabilitar botón durante la petición
-                button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Procesando...');
-
+                // Deshabilitar botón y mostrar loading
+                submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Actualizando...');
+                
+                var formData = new FormData(form[0]);
+                var url = form.attr('action');
+                
                 $.ajax({
-                    url: form.attr('action'),
-                    method: 'POST',
-                    data: form.serialize(),
+                    url: url,
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     success: function(response) {
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Éxito',
-                                text: response.message,
+                                title: '¡Éxito!',
+                                text: response.message || 'Estado actualizado exitosamente',
                                 timer: 2000,
                                 showConfirmButton: false
                             }).then(function() {
@@ -82,19 +99,97 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.message || 'Error al cambiar el estado del carnet'
+                                text: response.message || 'No se pudo actualizar el estado del carnet'
                             });
-                            button.prop('disabled', false).html(originalText);
+                            submitBtn.prop('disabled', false).html(originalText);
                         }
                     },
-                    error: function() {
+                    error: function(xhr) {
+                        var errorMsg = 'Ocurrió un error al actualizar el estado del carnet.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        }
+                        
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: 'Error al procesar la solicitud'
+                            text: errorMsg
                         });
-                        button.prop('disabled', false).html(originalText);
+                        submitBtn.prop('disabled', false).html(originalText);
                     }
+                });
+            });
+
+            // Manejar eliminación de carnets
+            $(document).on('click', '.delete-card-btn', function() {
+                var cardId = $(this).data('id');
+                var cardNumber = $(this).data('number');
+                
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    html: `¿Deseas eliminar el carnet <strong>${cardNumber}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    showLoaderOnConfirm: true,
+                    preConfirm: function() {
+                        return new Promise(function(resolve, reject) {
+                            var token = $('input[name="__RequestVerificationToken"]').val();
+                            
+                            $.ajax({
+                                url: '@Url.Action("Delete", "Cards")',
+                                type: 'POST',
+                                data: {
+                                    id: cardId,
+                                    __RequestVerificationToken: token
+                                },
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                success: function(response) {
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: '¡Eliminado!',
+                                            text: response.message || 'Carnet eliminado exitosamente.',
+                                            timer: 2000,
+                                            showConfirmButton: false
+                                        }).then(function() {
+                                            if (response.redirectUrl) {
+                                                window.location.href = response.redirectUrl;
+                                            } else {
+                                                window.location.reload();
+                                            }
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: response.message || 'No se pudo eliminar el carnet.'
+                                        });
+                                    }
+                                    resolve();
+                                },
+                                error: function(xhr) {
+                                    var errorMsg = 'Ocurrió un error al eliminar el carnet.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errorMsg = xhr.responseJSON.message;
+                                    }
+                                    
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: errorMsg
+                                    });
+                                    reject(errorMsg);
+                                }
+                            });
+                        });
+                    },
+                    allowOutsideClick: () => !Swal.isLoading()
                 });
             });
         });

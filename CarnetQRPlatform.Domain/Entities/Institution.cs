@@ -11,6 +11,7 @@ public class Institution : BaseEntity
     public string? Phone { get; set; }
     public string? Address { get; set; }
     public string CardPrefix { get; set; } = string.Empty;
+    public Guid? InstitutionTypeId { get; set; }
     public InstitutionType? InstitutionType { get; set; }
     public bool IsActive { get; set; } = true;
     public string? LogoPath { get; set; }

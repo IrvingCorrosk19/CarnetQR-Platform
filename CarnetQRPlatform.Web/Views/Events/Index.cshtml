@@ -42,25 +42,47 @@
                         </td>
                         <td>@(item.Notes ?? "-")</td>
                         <td>
-                            @if (item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled && item.ScheduledAt <= DateTime.UtcNow)
-                            {
-                                <form asp-action="UpdateStatus" method="post" class="d-inline form-update-status" data-status="Completed">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@item.Id" />
-                                    <input type="hidden" name="status" value="@CarnetQRPlatform.Domain.Entities.EventStatus.Completed" />
-                                    <button type="submit" class="btn btn-sm btn-success" title="Marcar como Completado">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                </form>
-                                <form asp-action="UpdateStatus" method="post" class="d-inline form-update-status" data-status="NotCompleted">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@item.Id" />
-                                    <input type="hidden" name="status" value="@CarnetQRPlatform.Domain.Entities.EventStatus.NotCompleted" />
-                                    <button type="submit" class="btn btn-sm btn-danger" title="Marcar como No Completado">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </form>
-                            }
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if (item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled)
+                                {
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
+                                        <i class="fas fa-edit me-1"></i> Editar
+                                    </a>
+                                }
+                                @if (item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled && item.ScheduledAt <= DateTime.UtcNow)
+                                {
+                                    <form asp-action="UpdateStatus" method="post" class="d-inline form-update-status" data-status="Completed">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <input type="hidden" name="status" value="@CarnetQRPlatform.Domain.Entities.EventStatus.Completed" />
+                                        <button type="submit" class="btn btn-sm btn-success" title="Marcar como Completado">
+                                            <i class="fas fa-check me-1"></i> Completar
+                                        </button>
+                                    </form>
+                                    <form asp-action="UpdateStatus" method="post" class="d-inline form-update-status" data-status="NotCompleted">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <input type="hidden" name="status" value="@CarnetQRPlatform.Domain.Entities.EventStatus.NotCompleted" />
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Marcar como No Completado">
+                                            <i class="fas fa-times me-1"></i> No Completado
+                                        </button>
+                                    </form>
+                                }
+                                @if (item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled || item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.NotCompleted)
+                                {
+                                    <form asp-action="ToggleActive" method="post" class="d-inline form-toggle-active">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="btn btn-sm @(item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled ? "btn-warning" : "btn-success")" title="@(item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled ? "Desactivar" : "Activar")">
+                                            <i class="fas fa-@(item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled ? "ban" : "check") me-1"></i>
+                                            @(item.Status == CarnetQRPlatform.Domain.Entities.EventStatus.Scheduled ? "Desactivar" : "Activar")
+                                        </button>
+                                    </form>
+                                }
+                                <button type="button" class="btn btn-danger btn-sm delete-event-btn" data-id="@item.Id" data-entity="@($"{item.EntityProfile?.FirstName} {item.EntityProfile?.LastName}")" data-date="@item.ScheduledAt.ToString("dd/MM/yyyy HH:mm")" title="Eliminar">
+                                    <i class="fas fa-trash me-1"></i> Eliminar
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 }
@@ -69,6 +91,7 @@
     </div>
 </div>
 @section Scripts {
+    @Html.AntiForgeryToken()
     <script>
         $(document).ready(function () {
             $('#eventsTable').DataTable({
@@ -84,18 +107,112 @@
                 var status = $(form).data('status');
                 var statusText = status === 'Completed' ? 'Completado' : 'No Completado';
                 
-                showConfirm('¿Actualizar estado?', '¿Desea marcar este evento como ' + statusText + '?', 'Sí, actualizar', 'Cancelar')
-                    .then((result) => {
-                        if (result.isConfirmed) {
-                            submitFormAjax(form, {
-                                loadingMessage: 'Actualizando estado...',
-                                successMessage: 'Estado actualizado exitosamente',
-                                successCallback: function() {
-                                    location.reload();
+                Swal.fire({
+                    title: '¿Actualizar estado?',
+                    text: '¿Desea marcar este evento como ' + statusText + '?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Sí, actualizar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        submitFormAjax(form, {
+                            loadingMessage: 'Actualizando estado...',
+                            successMessage: 'Estado actualizado exitosamente',
+                            successCallback: function() {
+                                location.reload();
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Toggle active con AJAX
+            $('.form-toggle-active').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Actualizando estado...',
+                    successMessage: 'Estado actualizado exitosamente',
+                    successCallback: function() {
+                        location.reload();
+                    }
+                });
+            });
+
+            // Manejar eliminación de eventos
+            $(document).on('click', '.delete-event-btn', function() {
+                var eventId = $(this).data('id');
+                var entityName = $(this).data('entity');
+                var eventDate = $(this).data('date');
+                
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    html: `¿Deseas eliminar el evento de <strong>${entityName}</strong> programado para <strong>${eventDate}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    showLoaderOnConfirm: true,
+                    preConfirm: function() {
+                        return new Promise(function(resolve, reject) {
+                            var token = $('input[name="__RequestVerificationToken"]').val();
+                            
+                            $.ajax({
+                                url: '@Url.Action("Delete", "Events")',
+                                type: 'POST',
+                                data: {
+                                    id: eventId,
+                                    __RequestVerificationToken: token
+                                },
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                success: function(response) {
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: '¡Eliminado!',
+                                            text: response.message || 'Evento eliminado exitosamente.',
+                                            timer: 2000,
+                                            showConfirmButton: false
+                                        }).then(function() {
+                                            if (response.redirectUrl) {
+                                                window.location.href = response.redirectUrl;
+                                            } else {
+                                                window.location.reload();
+                                            }
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: response.message || 'No se pudo eliminar el evento.'
+                                        });
+                                    }
+                                    resolve();
+                                },
+                                error: function(xhr) {
+                                    var errorMsg = 'Ocurrió un error al eliminar el evento.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errorMsg = xhr.responseJSON.message;
+                                    }
+                                    
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: errorMsg
+                                    });
+                                    reject(errorMsg);
                                 }
                             });
-                        }
-                    });
+                        });
+                    },
+                    allowOutsideClick: () => !Swal.isLoading()
+                });
             });
         });
     </script>

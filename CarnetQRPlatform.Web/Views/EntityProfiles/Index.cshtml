@@ -53,6 +53,14 @@
                                 <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
                                     <i class="fas fa-edit me-1"></i> Editar
                                 </a>
+                                <form asp-action="ToggleActive" method="post" class="d-inline form-toggle-active">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-warning" : "btn-success")" title="@(item.IsActive ? "Desactivar" : "Activar")">
+                                        <i class="fas fa-@(item.IsActive ? "ban" : "check") me-1"></i>
+                                        @(item.IsActive ? "Desactivar" : "Activar")
+                                    </button>
+                                </form>
                                 <button type="button" class="btn btn-danger btn-sm delete-entity-btn" data-id="@item.Id" data-name="@($"{item.FirstName} {item.LastName}")" title="Eliminar">
                                     <i class="fas fa-trash me-1"></i> Eliminar
                                 </button>
@@ -73,6 +81,19 @@
                 "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
                 "responsive": true,
                 "pageLength": 25
+            });
+
+            // Toggle active con AJAX
+            $('.form-toggle-active').on('submit', function(e) {
+                e.preventDefault();
+                var form = this;
+                submitFormAjax(form, {
+                    loadingMessage: 'Actualizando estado...',
+                    successMessage: 'Estado actualizado exitosamente',
+                    successCallback: function() {
+                        location.reload();
+                    }
+                });
             });
 
             // Manejar eliminación de entidades

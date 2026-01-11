@@ -419,6 +419,307 @@ public class UsersController : Controller
         return Json(new { success = false, message = errors });
     }
 
+    public async Task<IActionResult> Edit(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+        var userRoles = await _userManager.GetRolesAsync(user);
+        
+        // Si es InstitutionAdmin, solo puede editar usuarios de su institución
+        if (!isSuperAdmin)
+        {
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (!tenantId.HasValue || user.InstitutionId != tenantId.Value)
+            {
+                TempData["ErrorMessage"] = "No tiene permisos para editar este usuario.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // No permitir editar SuperAdmin si no eres SuperAdmin
+        if (!isSuperAdmin && userRoles.Contains(Roles.SuperAdmin))
+        {
+            TempData["ErrorMessage"] = "No tiene permisos para editar este usuario.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var model = new EditUserViewModel
+        {
+            Id = user.Id,
+            Email = user.Email ?? "",
+            FirstName = user.FirstName ?? "",
+            LastName = user.LastName ?? "",
+            InstitutionId = user.InstitutionId,
+            IsActive = user.IsActive
+        };
+
+        // Obtener el rol del usuario
+        if (userRoles.Any())
+        {
+            model.Role = userRoles.First();
+        }
+
+        if (isSuperAdmin)
+        {
+            var institutions = await _institutionService.GetAllAsync();
+            ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+        }
+        else
+        {
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (tenantId.HasValue)
+            {
+                ViewBag.InstitutionId = tenantId.Value;
+                var institution = await _institutionService.GetByIdAsync(tenantId.Value);
+                ViewBag.InstitutionName = institution?.Name;
+            }
+        }
+
+        // InstitutionAdmin no puede editar otros InstitutionAdmin ni SuperAdmin
+        var availableRoles = isSuperAdmin 
+            ? new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator }
+            : new[] { Roles.Staff, Roles.AdministrativeOperator };
+        ViewBag.AvailableRoles = availableRoles;
+        ViewBag.IsSuperAdmin = isSuperAdmin;
+
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(EditUserViewModel model)
+    {
+        var user = await _userManager.FindByIdAsync(model.Id);
+        if (user == null)
+        {
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = "Usuario no encontrado." });
+            }
+            return NotFound();
+        }
+
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+        var userRoles = await _userManager.GetRolesAsync(user);
+
+        // Si es InstitutionAdmin, solo puede editar usuarios de su institución
+        if (!isSuperAdmin)
+        {
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (!tenantId.HasValue || user.InstitutionId != tenantId.Value)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "No tiene permisos para editar este usuario." });
+                }
+                TempData["ErrorMessage"] = "No tiene permisos para editar este usuario.";
+                return RedirectToAction(nameof(Index));
+            }
+            model.InstitutionId = tenantId.Value;
+        }
+
+        // Validaciones
+        if (!isSuperAdmin)
+        {
+            // InstitutionAdmin no puede cambiar el rol a InstitutionAdmin o SuperAdmin
+            if (model.Role == Roles.SuperAdmin || model.Role == Roles.InstitutionAdmin)
+            {
+                ModelState.AddModelError(nameof(model.Role), "No tiene permisos para asignar este rol.");
+            }
+        }
+        else
+        {
+            // Validar que se seleccionó una institución si el rol no es SuperAdmin
+            if (model.Role != Roles.SuperAdmin && model.InstitutionId == Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(model.InstitutionId), "Debe seleccionar una empresa para este rol.");
+            }
+
+            // Validar que SuperAdmin no tenga institución
+            if (model.Role == Roles.SuperAdmin && model.InstitutionId != Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(model.InstitutionId), "El SuperAdmin no puede tener una empresa asignada.");
+            }
+        }
+
+        // Validar email único (si cambió)
+        if (model.Email != user.Email)
+        {
+            var existingUser = await _userManager.FindByEmailAsync(model.Email);
+            if (existingUser != null && existingUser.Id != user.Id)
+            {
+                ModelState.AddModelError(nameof(model.Email), "Este correo electrónico ya está registrado.");
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            if (isSuperAdmin)
+            {
+                var institutions = await _institutionService.GetAllAsync();
+                ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            }
+            else
+            {
+                var tenantId = _tenantProvider.GetCurrentTenantId();
+                if (tenantId.HasValue)
+                {
+                    ViewBag.InstitutionId = tenantId.Value;
+                    var institution = await _institutionService.GetByIdAsync(tenantId.Value);
+                    ViewBag.InstitutionName = institution?.Name;
+                }
+            }
+
+            var availableRoles = isSuperAdmin 
+                ? new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator }
+                : new[] { Roles.Staff, Roles.AdministrativeOperator };
+            ViewBag.AvailableRoles = availableRoles;
+            ViewBag.IsSuperAdmin = isSuperAdmin;
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                return Json(new { success = false, message = string.Join(" ", errors) });
+            }
+            return View(model);
+        }
+
+        try
+        {
+            // Validar que la institución existe y está activa (si se proporcionó)
+            if (model.InstitutionId.HasValue && model.InstitutionId != Guid.Empty)
+            {
+                var institution = await _institutionService.GetByIdAsync(model.InstitutionId.Value);
+                if (institution == null || !institution.IsActive)
+                {
+                    ModelState.AddModelError(nameof(model.InstitutionId), "La empresa seleccionada no existe o está inactiva.");
+                    if (isSuperAdmin)
+                    {
+                        var institutions = await _institutionService.GetAllAsync();
+                        ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+                    }
+                    var availableRoles = isSuperAdmin 
+                        ? new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator }
+                        : new[] { Roles.Staff, Roles.AdministrativeOperator };
+                    ViewBag.AvailableRoles = availableRoles;
+                    ViewBag.IsSuperAdmin = isSuperAdmin;
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                    {
+                        return Json(new { success = false, message = "La empresa seleccionada no existe o está inactiva." });
+                    }
+                    return View(model);
+                }
+            }
+
+            // Actualizar datos del usuario
+            user.Email = model.Email;
+            user.UserName = model.Email;
+            user.FirstName = model.FirstName;
+            user.LastName = model.LastName;
+            user.IsActive = model.IsActive;
+            user.InstitutionId = model.InstitutionId != Guid.Empty ? model.InstitutionId : null;
+
+            // Actualizar InstitutionId claim
+            var existingClaims = await _userManager.GetClaimsAsync(user);
+            var institutionClaim = existingClaims.FirstOrDefault(c => c.Type == "InstitutionId");
+            
+            if (user.InstitutionId.HasValue)
+            {
+                if (institutionClaim == null)
+                {
+                    await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("InstitutionId", user.InstitutionId.Value.ToString()));
+                }
+                else if (institutionClaim.Value != user.InstitutionId.Value.ToString())
+                {
+                    await _userManager.RemoveClaimAsync(user, institutionClaim);
+                    await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("InstitutionId", user.InstitutionId.Value.ToString()));
+                }
+            }
+            else if (institutionClaim != null)
+            {
+                await _userManager.RemoveClaimAsync(user, institutionClaim);
+            }
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                foreach (var error in updateResult.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    var errors = updateResult.Errors.Select(e => e.Description);
+                    return Json(new { success = false, message = string.Join(" ", errors) });
+                }
+                return View(model);
+            }
+
+            // Actualizar rol si cambió
+            if (!string.IsNullOrEmpty(model.Role) && !userRoles.Contains(model.Role))
+            {
+                // Remover todos los roles actuales
+                foreach (var role in userRoles)
+                {
+                    await _userManager.RemoveFromRoleAsync(user, role);
+                }
+                // Agregar el nuevo rol
+                await _userManager.AddToRoleAsync(user, model.Role);
+            }
+
+            // Registrar auditoría
+            if (user.InstitutionId.HasValue)
+            {
+                var currentUserId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    user.InstitutionId.Value,
+                    currentUserId,
+                    "UPDATE",
+                    "AppUser",
+                    user.Id,
+                    new Dictionary<string, object> { { "Email", user.Email ?? "" }, { "Role", model.Role } });
+            }
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = true, message = "Usuario actualizado exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+            }
+
+            TempData["SuccessMessage"] = "Usuario actualizado exitosamente.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user");
+            var errorMsg = "Error al actualizar el usuario.";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            ModelState.AddModelError("", errorMsg);
+            if (isSuperAdmin)
+            {
+                var institutions = await _institutionService.GetAllAsync();
+                ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            }
+            var availableRoles = isSuperAdmin 
+                ? new[] { Roles.InstitutionAdmin, Roles.Staff, Roles.AdministrativeOperator }
+                : new[] { Roles.Staff, Roles.AdministrativeOperator };
+            ViewBag.AvailableRoles = availableRoles;
+            ViewBag.IsSuperAdmin = isSuperAdmin;
+            return View(model);
+        }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string id)

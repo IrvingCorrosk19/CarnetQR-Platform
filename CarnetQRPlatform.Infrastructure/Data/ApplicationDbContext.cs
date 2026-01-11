@@ -16,6 +16,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
     }
 
     public DbSet<Institution> Institutions { get; set; }
+    public DbSet<Domain.Entities.InstitutionType> InstitutionTypes { get; set; }
     public DbSet<EntityProfile> EntityProfiles { get; set; }
     public DbSet<Card> Cards { get; set; }
     public DbSet<CardTemplate> CardTemplates { get; set; }
@@ -26,6 +27,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
     {
         base.OnModelCreating(builder);
 
+        ConfigureInstitutionType(builder);
         ConfigureInstitution(builder);
         ConfigureEntityProfile(builder);
         ConfigureCard(builder);
@@ -119,6 +121,16 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
         return SaveChangesAsync().GetAwaiter().GetResult();
     }
 
+    private void ConfigureInstitutionType(ModelBuilder builder)
+    {
+        builder.Entity<Domain.Entities.InstitutionType>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+    }
+
     private void ConfigureInstitution(ModelBuilder builder)
     {
         builder.Entity<Institution>(entity =>
@@ -128,10 +140,13 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
             entity.Property(e => e.CardPrefix).IsRequired().HasMaxLength(10);
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.CardPrefix).IsUnique();
+            entity.HasIndex(e => e.InstitutionTypeId);
             
-            // Configurar enum InstitutionType
-            entity.Property(e => e.InstitutionType)
-                .HasConversion<int>();
+            // Configurar relación con InstitutionType
+            entity.HasOne(e => e.InstitutionType)
+                .WithMany(it => it.Institutions)
+                .HasForeignKey(e => e.InstitutionTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
             
             // Configurar enum QrPublicDisplayMode
             entity.Property(e => e.QrPublicDisplayMode)

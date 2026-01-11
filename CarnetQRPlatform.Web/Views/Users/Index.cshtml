@@ -70,6 +70,9 @@
                         <td>@(item.LastLoginAt?.ToString("dd/MM/yyyy HH:mm") ?? "Nunca")</td>
                         <td>
                             <div class="d-flex gap-2">
+                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
+                                    <i class="fas fa-edit me-1"></i> Editar
+                                </a>
                                 <form asp-action="ToggleActive" method="post" class="d-inline form-toggle-active">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@item.Id" />
@@ -78,6 +81,9 @@
                                         @(item.IsActive ? "Desactivar" : "Activar")
                                     </button>
                                 </form>
+                                <button type="button" class="btn btn-danger btn-sm delete-user-btn" data-id="@item.Id" data-email="@item.Email" title="Eliminar">
+                                    <i class="fas fa-trash me-1"></i> Eliminar
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -88,6 +94,7 @@
 </div>
 
 @section Scripts {
+    @Html.AntiForgeryToken()
     <script>
         $(document).ready(function () {
             $('#usersTable').DataTable({
@@ -107,6 +114,79 @@
                     successCallback: function() {
                         location.reload();
                     }
+                });
+            });
+
+            // Manejar eliminación de usuarios
+            $(document).on('click', '.delete-user-btn', function() {
+                var userId = $(this).data('id');
+                var userEmail = $(this).data('email');
+                
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    html: `¿Deseas eliminar el usuario <strong>${userEmail}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    showLoaderOnConfirm: true,
+                    preConfirm: function() {
+                        return new Promise(function(resolve, reject) {
+                            var token = $('input[name="__RequestVerificationToken"]').val();
+                            
+                            $.ajax({
+                                url: '@Url.Action("Delete", "Users")',
+                                type: 'POST',
+                                data: {
+                                    id: userId,
+                                    __RequestVerificationToken: token
+                                },
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                success: function(response) {
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: '¡Eliminado!',
+                                            text: response.message || 'Usuario eliminado exitosamente.',
+                                            timer: 2000,
+                                            showConfirmButton: false
+                                        }).then(function() {
+                                            if (response.redirectUrl) {
+                                                window.location.href = response.redirectUrl;
+                                            } else {
+                                                window.location.reload();
+                                            }
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: response.message || 'No se pudo eliminar el usuario.'
+                                        });
+                                    }
+                                    resolve();
+                                },
+                                error: function(xhr) {
+                                    var errorMsg = 'Ocurrió un error al eliminar el usuario.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errorMsg = xhr.responseJSON.message;
+                                    }
+                                    
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: errorMsg
+                                    });
+                                    reject(errorMsg);
+                                }
+                            });
+                        });
+                    },
+                    allowOutsideClick: () => !Swal.isLoading()
                 });
             });
         });

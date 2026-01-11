@@ -1,0 +1,124 @@
+@model Guid
+@using CarnetQRPlatform.Domain.Constants
+@{
+    ViewData["Title"] = "Nuevo Carnet";
+    var availableEntities = ViewBag.AvailableEntities as List<CarnetQRPlatform.Domain.Entities.EntityProfile>;
+    var isSuperAdmin = ViewBag.IsSuperAdmin as bool? ?? User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-id-card me-2"></i>
+            Nuevo Carnet
+        </h3>
+    </div>
+    <form asp-action="Create" method="post" id="createCardForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Seleccione una entidad para generar su carnet. Solo se pueden crear carnets para entidades que no tengan un carnet activo.
+            </div>
+
+            @* Filtro de institución solo para SuperAdmin *@
+            @if (isSuperAdmin && institutions != null && institutions.Any())
+            {
+                <div class="form-group mb-4">
+                    <label for="InstitutionFilter" class="form-label">Filtrar por Empresa</label>
+                    <select id="InstitutionFilter" class="form-select">
+                        <option value="">-- Todas las empresas --</option>
+                        @foreach (var institution in institutions)
+                        {
+                            <option value="@institution.Id">@institution.Name</option>
+                        }
+                    </select>
+                    <small class="form-text text-muted">Opcional: Filtre las entidades por empresa.</small>
+                </div>
+            }
+
+            <div class="form-group mb-4">
+                <label for="entityProfileId" class="form-label">Entidad <span class="text-danger">*</span></label>
+                <select name="entityProfileId" id="entityProfileId" class="form-select" required>
+                    <option value="">-- Seleccione una entidad --</option>
+                    @if (availableEntities != null && availableEntities.Any())
+                    {
+                        @foreach (var entity in availableEntities)
+                        {
+                            <option value="@entity.Id" data-institution-id="@entity.InstitutionId">
+                                @($"{entity.FirstName} {entity.LastName}")@(!string.IsNullOrEmpty(entity.IdentificationNumber) ? $" - {entity.IdentificationNumber}" : "")@(isSuperAdmin && entity.Institution != null ? $" ({entity.Institution.Name})" : "")
+                            </option>
+                        }
+                    }
+                </select>
+                <small class="form-text text-muted">Solo se muestran entidades activas que no tienen un carnet activo.</small>
+                @if (availableEntities == null || !availableEntities.Any())
+                {
+                    <div class="alert alert-warning mt-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        No hay entidades disponibles para generar carnets. Todas las entidades activas ya tienen un carnet activo o no hay entidades activas.
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary" @(availableEntities == null || !availableEntities.Any() ? "disabled" : "")>
+                <i class="fas fa-save"></i> Crear Carnet
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            @if (isSuperAdmin)
+            {
+                <text>
+                // Filtro de institución para SuperAdmin
+                $('#InstitutionFilter').on('change', function() {
+                    var selectedInstitutionId = $(this).val();
+                    var $entitySelect = $('#entityProfileId');
+                    var currentValue = $entitySelect.val();
+                    
+                    $entitySelect.find('option').each(function() {
+                        var $option = $(this);
+                        var institutionId = $option.data('institution-id');
+                        
+                        if ($option.val() === '') {
+                            $option.show();
+                        } else if (selectedInstitutionId === '' || institutionId == selectedInstitutionId) {
+                            $option.show();
+                        } else {
+                            $option.hide();
+                        }
+                    });
+                    
+                    // Si la entidad seleccionada no coincide con el filtro, limpiar selección
+                    var selectedOption = $entitySelect.find('option:selected');
+                    if (selectedInstitutionId && selectedOption.data('institution-id') !== selectedInstitutionId) {
+                        $entitySelect.val('');
+                    }
+                });
+                </text>
+            }
+
+            $('#createCardForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Creando carnet...',
+                    successMessage: 'Carnet creado exitosamente',
+                    redirectUrl: '@Url.Action("Index", "Cards")'
+                });
+            });
+        });
+    </script>
+}
+

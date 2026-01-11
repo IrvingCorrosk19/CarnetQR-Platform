@@ -201,6 +201,208 @@ public class EventsController : Controller
         }
     }
 
+    public async Task<IActionResult> Edit(Guid id)
+    {
+        var eventRecord = await _eventService.GetByIdAsync(id);
+        if (eventRecord == null)
+        {
+            return NotFound();
+        }
+
+        // No permitir editar eventos completados
+        if (eventRecord.Status != EventStatus.Scheduled)
+        {
+            TempData["ErrorMessage"] = "Solo se pueden editar eventos programados.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // Cargar entidades según el rol del usuario
+        await LoadEntityProfilesForView();
+
+        return View(eventRecord);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(Guid id, EventRecord eventRecord)
+    {
+        if (id != eventRecord.Id)
+        {
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = "ID no coincide." });
+            }
+            return NotFound();
+        }
+
+        var existingEvent = await _eventService.GetByIdAsync(id);
+        if (existingEvent == null)
+        {
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = "Evento no encontrado." });
+            }
+            return NotFound();
+        }
+
+        // No permitir editar eventos completados
+        if (existingEvent.Status != EventStatus.Scheduled)
+        {
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = "Solo se pueden editar eventos programados." });
+            }
+            TempData["ErrorMessage"] = "Solo se pueden editar eventos programados.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await LoadEntityProfilesForView();
+            
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                return Json(new { success = false, message = string.Join(" ", errors) });
+            }
+            return View(eventRecord);
+        }
+
+        try
+        {
+            // Actualizar campos editables
+            existingEvent.EntityProfileId = eventRecord.EntityProfileId;
+            existingEvent.ScheduledAt = eventRecord.ScheduledAt;
+            existingEvent.Notes = eventRecord.Notes;
+
+            // Usar UpdateStatusAsync para actualizar (aunque no cambiemos el status)
+            // O mejor, necesitamos un método UpdateAsync en el servicio
+            // Por ahora, voy a usar el contexto directamente o agregar UpdateAsync al servicio
+            
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            await _auditService.LogActionAsync(
+                existingEvent.InstitutionId,
+                userId,
+                "UPDATE",
+                "EventRecord",
+                existingEvent.Id.ToString(),
+                new Dictionary<string, object> 
+                { 
+                    { "ScheduledAt", existingEvent.ScheduledAt }, 
+                    { "EntityProfileId", existingEvent.EntityProfileId.ToString() },
+                    { "Notes", existingEvent.Notes ?? "" }
+                });
+
+            // Necesitamos actualizar el evento - voy a verificar si hay UpdateAsync
+            // Si no existe, lo agregaremos al servicio
+            var updated = await _eventService.UpdateAsync(existingEvent);
+            
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = true, message = "Evento actualizado exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+            }
+
+            TempData["SuccessMessage"] = "Evento actualizado exitosamente.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating event");
+            var errorMsg = $"Error al actualizar el evento: {ex.Message}";
+            
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            await LoadEntityProfilesForView();
+            ModelState.AddModelError("", errorMsg);
+            return View(eventRecord);
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleActive(Guid id)
+    {
+        try
+        {
+            var eventRecord = await _eventService.GetByIdAsync(id);
+            if (eventRecord == null)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Evento no encontrado." });
+                }
+                return NotFound();
+            }
+
+            // Cambiar entre Scheduled y NotCompleted (desactivar/activar)
+            // Solo se puede desactivar eventos programados
+            EventStatus newStatus;
+            if (eventRecord.Status == EventStatus.Scheduled)
+            {
+                newStatus = EventStatus.NotCompleted;
+            }
+            else if (eventRecord.Status == EventStatus.NotCompleted)
+            {
+                newStatus = EventStatus.Scheduled;
+            }
+            else
+            {
+                // No se puede cambiar el estado de eventos completados
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "No se puede cambiar el estado de eventos completados." });
+                }
+                TempData["ErrorMessage"] = "No se puede cambiar el estado de eventos completados.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var updated = await _eventService.UpdateStatusAsync(id, newStatus);
+            
+            // Registrar auditoría
+            var userId = _userManager.GetUserId(User);
+            await _auditService.LogActionAsync(
+                updated.InstitutionId,
+                userId,
+                "TOGGLE_ACTIVE",
+                "EventRecord",
+                updated.Id.ToString(),
+                new Dictionary<string, object> 
+                { 
+                    { "OldStatus", eventRecord.Status.ToString() }, 
+                    { "NewStatus", newStatus.ToString() } 
+                });
+
+            var message = newStatus == EventStatus.Scheduled 
+                ? "Evento activado exitosamente." 
+                : "Evento desactivado exitosamente.";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = true, message = message, status = newStatus.ToString() });
+            }
+
+            TempData["SuccessMessage"] = message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error toggling event active status");
+            var errorMsg = "Error al cambiar el estado del evento.";
+            
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+            
+            TempData["ErrorMessage"] = errorMsg;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(Guid id)

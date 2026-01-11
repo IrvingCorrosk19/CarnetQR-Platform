@@ -97,6 +97,10 @@ app.UseMiddleware<TenantMiddleware>();
 
 app.UseAuthorization();
 
+// Map API controllers
+app.MapControllers();
+
+// Map MVC controllers
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

@@ -28,7 +28,7 @@ public class CreateInstitutionViewModel
 
     [Required]
     [Display(Name = "Tipo de Institución")]
-    public Domain.Enums.InstitutionType? InstitutionType { get; set; }
+    public Guid? InstitutionTypeId { get; set; }
 
     // Datos del Administrador
     [Required]

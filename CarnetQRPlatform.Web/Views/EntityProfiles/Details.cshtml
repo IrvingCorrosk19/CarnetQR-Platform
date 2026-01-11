@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Detalle de Entidad";
     var cards = ViewBag.Cards as IEnumerable<CarnetQRPlatform.Domain.Entities.Card> ?? Enumerable.Empty<CarnetQRPlatform.Domain.Entities.Card>();
+    var institution = ViewBag.Institution as CarnetQRPlatform.Domain.Entities.Institution;
 }
 
 <div class="card fade-in">
@@ -15,6 +16,10 @@
         <div class="row">
             <div class="col-md-8">
                 <dl class="row">
+                    @if (institution != null)
+                    {
+                        <dt class="col-sm-3">Empresa:</dt><dd class="col-sm-9">@institution.Name</dd>
+                    }
                     <dt class="col-sm-3">Identificación:</dt><dd class="col-sm-9">@(Model.IdentificationNumber ?? "-")</dd>
                     <dt class="col-sm-3">Nombre:</dt><dd class="col-sm-9">@($"{Model.FirstName} {Model.LastName}")</dd>
                     <dt class="col-sm-3">Email:</dt><dd class="col-sm-9">@(Model.Email ?? "-")</dd>

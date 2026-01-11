@@ -93,6 +93,46 @@ public class EventService : IEventService
         return eventRecord;
     }
 
+    public async Task<EventRecord> UpdateAsync(EventRecord eventRecord)
+    {
+        // MULTI-TENANT ESTRICTO: GetByIdAsync ya aplica filtro de tenant
+        var existingEvent = await GetByIdAsync(eventRecord.Id);
+        if (existingEvent == null)
+        {
+            throw new ArgumentException("EventRecord not found or access denied");
+        }
+
+        // No permitir editar eventos completados
+        if (existingEvent.Status != EventStatus.Scheduled)
+        {
+            throw new InvalidOperationException("Solo se pueden editar eventos programados.");
+        }
+
+        // VALIDAR que EntityProfile pertenece al mismo tenant
+        var tenantId = _tenantProvider.GetCurrentTenantId();
+        if (tenantId.HasValue)
+        {
+            var entityProfile = await _context.EntityProfiles
+                .FirstOrDefaultAsync(ep => ep.Id == eventRecord.EntityProfileId && ep.InstitutionId == tenantId.Value);
+            
+            if (entityProfile == null)
+            {
+                throw new InvalidOperationException(
+                    "Entity profile not found or does not belong to the current tenant");
+            }
+        }
+
+        // Actualizar solo campos permitidos (InstitutionId se preserva, no se puede cambiar)
+        existingEvent.EntityProfileId = eventRecord.EntityProfileId;
+        existingEvent.ScheduledAt = eventRecord.ScheduledAt;
+        existingEvent.Notes = eventRecord.Notes;
+        existingEvent.UpdatedAt = DateTime.UtcNow;
+        
+        _context.EventRecords.Update(existingEvent);
+        await _context.SaveChangesAsync();
+        return existingEvent;
+    }
+
     public async Task<EventRecord> UpdateStatusAsync(Guid id, EventStatus status)
     {
         // MULTI-TENANT ESTRICTO: GetByIdAsync ya aplica filtro de tenant
@@ -109,7 +149,10 @@ public class EventService : IEventService
 
         // Actualizar solo campos permitidos (InstitutionId se preserva)
         eventRecord.Status = status;
-        eventRecord.CompletedAt = DateTime.UtcNow;
+        if (status != EventStatus.Scheduled)
+        {
+            eventRecord.CompletedAt = DateTime.UtcNow;
+        }
         eventRecord.UpdatedAt = DateTime.UtcNow;
         
         _context.EventRecords.Update(eventRecord);

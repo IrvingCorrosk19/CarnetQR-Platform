@@ -1,6 +1,9 @@
 @model CarnetQRPlatform.Domain.Entities.EntityProfile
+@using CarnetQRPlatform.Domain.Constants
 @{
     ViewData["Title"] = "Editar Entidad";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
     var photoEnabled = ViewBag.PhotoEnabled as bool? ?? false;
 }
 
@@ -15,12 +18,35 @@
         <div class="card-body">
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
-            <input type="hidden" asp-for="InstitutionId" />
             @if (!string.IsNullOrEmpty(Model.PhotoPath))
             {
                 <input type="hidden" id="CurrentPhotoPath" value="@Model.PhotoPath" />
             }
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            
+            @* Selector de empresa solo para SuperAdmin *@
+            @if (isSuperAdmin && institutions != null)
+            {
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label asp-for="InstitutionId" class="form-label">Empresa <span class="text-danger">*</span></label>
+                            <select asp-for="InstitutionId" class="form-select" id="InstitutionId" required>
+                                <option value="">-- Seleccione una empresa --</option>
+                                @foreach (var institution in institutions)
+                                {
+                                    <option value="@institution.Id" selected="@(Model.InstitutionId == institution.Id)">@institution.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="InstitutionId" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" asp-for="InstitutionId" />
+            }
             
             <div class="row">
                 <div class="col-md-6">
@@ -154,6 +180,34 @@
                 
                 var form = this;
                 var formData = new FormData(form);
+                
+                @if (isSuperAdmin)
+                {
+                    <text>
+                    // Validar que se haya seleccionado una institución (solo para SuperAdmin)
+                    var institutionId = $('#InstitutionId').val();
+                    if (!institutionId || institutionId === '') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Debe seleccionar una empresa.'
+                        });
+                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
+                        return false;
+                    }
+                    </text>
+                }
+                else
+                {
+                    <text>
+                    // Asegurar que InstitutionId se envíe (para usuarios no-SuperAdmin)
+                    var institutionId = $('input[name="InstitutionId"]').val();
+                    if (!institutionId || institutionId === '') {
+                        // Si no está en el formData, agregarlo desde el modelo
+                        formData.append('InstitutionId', '@Model.InstitutionId.ToString()');
+                    }
+                    </text>
+                }
                 
                 // Validar archivo de foto si se seleccionó uno
                 var photoFile = $('#PhotoFile')[0].files[0];
