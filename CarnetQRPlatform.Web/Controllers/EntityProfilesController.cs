@@ -297,8 +297,30 @@ public class EntityProfilesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(Guid id, EntityProfile entityProfile)
     {
-        _logger.LogInformation("[EntityProfiles/Edit POST] Iniciando actualización de entidad. EntityId={EntityId}, User={User}, IsSuperAdmin={IsSuperAdmin}, ReceivedInstitutionId={ReceivedInstitutionId}", 
-            id, User.Identity?.Name, User.IsInRole(Roles.SuperAdmin), entityProfile.InstitutionId);
+        // Log ANTES de cualquier validación para ver qué está llegando
+        _logger.LogInformation("[EntityProfiles/Edit POST] Iniciando actualización. EntityId={EntityId}, User={User}, IsSuperAdmin={IsSuperAdmin}", 
+            id, User.Identity?.Name, User.IsInRole(Roles.SuperAdmin));
+        
+        // Verificar qué valores están llegando en el request
+        var institutionIdFromForm = Request.Form["InstitutionId"].ToString();
+        _logger.LogInformation("[EntityProfiles/Edit POST] InstitutionId del Form: '{FormInstitutionId}', EntityProfile.InstitutionId: '{EntityInstitutionId}', IsEmpty: {IsEmpty}", 
+            institutionIdFromForm, entityProfile.InstitutionId, entityProfile.InstitutionId == Guid.Empty);
+        
+        // Log del estado del ModelState ANTES de remover
+        if (ModelState.ContainsKey(nameof(entityProfile.InstitutionId)))
+        {
+            var institutionIdState = ModelState[nameof(entityProfile.InstitutionId)];
+            _logger.LogInformation("[EntityProfiles/Edit POST] ModelState contiene InstitutionId. Errors: {ErrorCount}, AttemptedValue: '{AttemptedValue}'", 
+                institutionIdState?.Errors.Count ?? 0, institutionIdState?.AttemptedValue ?? "null");
+            foreach (var error in institutionIdState?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
+            {
+                _logger.LogWarning("[EntityProfiles/Edit POST] Error en InstitutionId: {ErrorMessage}", error.ErrorMessage);
+            }
+        }
+        else
+        {
+            _logger.LogInformation("[EntityProfiles/Edit POST] ModelState NO contiene InstitutionId");
+        }
         
         if (id != entityProfile.Id)
         {
@@ -325,10 +347,21 @@ public class EntityProfilesController : Controller
         _logger.LogInformation("[EntityProfiles/Edit POST] Entidad existente encontrada. ExistingInstitutionId={ExistingInstitutionId}, ReceivedInstitutionId={ReceivedInstitutionId}", 
             existingEntity.InstitutionId, entityProfile.InstitutionId);
 
-        // Remover InstitutionId del ModelState para evitar validación automática
+        // Si InstitutionId viene vacío pero está en el Form, intentar parsearlo
+        if (entityProfile.InstitutionId == Guid.Empty && !string.IsNullOrEmpty(institutionIdFromForm))
+        {
+            if (Guid.TryParse(institutionIdFromForm, out var parsedInstitutionId))
+            {
+                _logger.LogInformation("[EntityProfiles/Edit POST] InstitutionId estaba vacío, parseado desde Form: {ParsedInstitutionId}", parsedInstitutionId);
+                entityProfile.InstitutionId = parsedInstitutionId;
+            }
+        }
+
+        // Remover InstitutionId e Institution del ModelState para evitar validación automática
         // Lo validaremos manualmente según el rol
         ModelState.Remove(nameof(entityProfile.InstitutionId));
-        _logger.LogInformation("[EntityProfiles/Edit POST] InstitutionId removido del ModelState para validación manual");
+        ModelState.Remove(nameof(entityProfile.Institution)); // Remover también la propiedad de navegación
+        _logger.LogInformation("[EntityProfiles/Edit POST] InstitutionId e Institution removidos del ModelState para validación manual");
         
         // Si es SuperAdmin, validar que haya seleccionado una institución
         if (User.IsInRole(Roles.SuperAdmin))
