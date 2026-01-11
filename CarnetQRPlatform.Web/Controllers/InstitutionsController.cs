@@ -363,5 +363,80 @@ public class InstitutionsController : Controller
         }
         return Json(new { photoEnabled = institution.PhotoEnabled });
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        try
+        {
+            var institution = await _institutionService.GetByIdAsync(id);
+            if (institution == null)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Institución no encontrada." });
+                }
+                return NotFound();
+            }
+
+            var institutionName = institution.Name;
+            var deleted = await _institutionService.DeleteAsync(id);
+
+            if (deleted)
+            {
+                // Registrar auditoría
+                var userId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    id,
+                    userId,
+                    "DELETE",
+                    "Institution",
+                    id.ToString(),
+                    new Dictionary<string, object> { { "Name", institutionName } });
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = true, message = "Institución eliminada exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+                }
+
+                TempData["SuccessMessage"] = "Institución eliminada exitosamente.";
+            }
+            else
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "No se pudo eliminar la institución." });
+                }
+                TempData["ErrorMessage"] = "No se pudo eliminar la institución.";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation deleting institution");
+            var errorMsg = ex.Message;
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            TempData["ErrorMessage"] = errorMsg;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting institution");
+            var errorMsg = $"Error al eliminar la institución: {ex.Message}";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            TempData["ErrorMessage"] = errorMsg;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
 }
 

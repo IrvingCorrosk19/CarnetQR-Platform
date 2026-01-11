@@ -122,5 +122,69 @@ public class CardsController : Controller
 
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        try
+        {
+            var card = await _cardService.GetByIdAsync(id);
+            if (card == null)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Carnet no encontrado." });
+                }
+                return NotFound();
+            }
+
+            var institutionId = card.InstitutionId;
+            var cardNumber = card.CardNumber;
+            var deleted = await _cardService.DeleteAsync(id);
+
+            if (deleted)
+            {
+                // Registrar auditoría
+                var userId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    institutionId,
+                    userId,
+                    "DELETE",
+                    "Card",
+                    id.ToString(),
+                    new Dictionary<string, object> { { "CardNumber", cardNumber } });
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = true, message = "Carnet eliminado exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+                }
+
+                TempData["SuccessMessage"] = "Carnet eliminado exitosamente.";
+            }
+            else
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "No se pudo eliminar el carnet." });
+                }
+                TempData["ErrorMessage"] = "No se pudo eliminar el carnet.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting card");
+            var errorMsg = $"Error al eliminar el carnet: {ex.Message}";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            TempData["ErrorMessage"] = errorMsg;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
 }
 

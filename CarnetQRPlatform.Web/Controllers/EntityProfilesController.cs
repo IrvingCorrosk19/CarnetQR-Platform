@@ -622,6 +622,71 @@ public class EntityProfilesController : Controller
         }
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleActive(Guid id)
+    {
+        try
+        {
+            var entity = await _entityProfileService.GetByIdAsync(id);
+            if (entity == null)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Entidad no encontrada." });
+                }
+                return NotFound();
+            }
+
+            var oldStatus = entity.IsActive;
+            var result = await _entityProfileService.ToggleActiveAsync(id);
+
+            if (result)
+            {
+                // Registrar auditoría
+                var userId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    entity.InstitutionId,
+                    userId,
+                    "TOGGLE_ACTIVE",
+                    "EntityProfile",
+                    id.ToString(),
+                    new Dictionary<string, object> { { "Name", $"{entity.FirstName} {entity.LastName}" }, { "OldStatus", oldStatus }, { "NewStatus", !oldStatus } });
+
+                var message = !oldStatus ? "Entidad activada exitosamente." : "Entidad desactivada exitosamente.";
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = true, message = message, isActive = !oldStatus });
+                }
+
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Error al cambiar el estado de la entidad." });
+                }
+                TempData["ErrorMessage"] = "Error al cambiar el estado de la entidad.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error toggling entity profile active status");
+            var errorMsg = "Error al cambiar el estado de la entidad.";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            TempData["ErrorMessage"] = errorMsg;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     private async Task<bool> ValidateImageFile(IFormFile file)
     {
         try

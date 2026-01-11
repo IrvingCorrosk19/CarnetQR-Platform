@@ -4,6 +4,7 @@ using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using System.Collections.Generic;
 
 namespace CarnetQRPlatform.Infrastructure.Services;
 
@@ -131,6 +132,57 @@ public class InstitutionService : IInstitutionService
     {
         var institution = await _context.Institutions.FindAsync(id);
         if (institution == null) return false;
+
+        // VALIDACIONES: Verificar relaciones antes de eliminar
+        var errors = new List<string>();
+
+        // Verificar usuarios asociados
+        var hasUsers = await _context.Users
+            .AnyAsync(u => u.InstitutionId == id);
+        if (hasUsers)
+        {
+            errors.Add("usuarios");
+        }
+
+        // Verificar entidades asociadas
+        var hasEntities = await _context.EntityProfiles
+            .AnyAsync(e => e.InstitutionId == id);
+        if (hasEntities)
+        {
+            errors.Add("entidades");
+        }
+
+        // Verificar carnets asociados
+        var hasCards = await _context.Cards
+            .AnyAsync(c => c.InstitutionId == id);
+        if (hasCards)
+        {
+            errors.Add("carnets");
+        }
+
+        // Verificar eventos asociados
+        var hasEvents = await _context.EventRecords
+            .AnyAsync(e => e.InstitutionId == id);
+        if (hasEvents)
+        {
+            errors.Add("eventos");
+        }
+
+        // Verificar plantillas de carnet asociadas
+        var hasTemplates = await _context.CardTemplates
+            .AnyAsync(t => t.InstitutionId == id);
+        if (hasTemplates)
+        {
+            errors.Add("plantillas de carnet");
+        }
+
+        // Si hay relaciones, lanzar excepción con mensaje detallado
+        if (errors.Count > 0)
+        {
+            var errorMessage = $"No se puede eliminar la institución porque tiene {string.Join(", ", errors)} asociados. " +
+                              "Elimine primero los elementos relacionados.";
+            throw new InvalidOperationException(errorMessage);
+        }
 
         _context.Institutions.Remove(institution);
         await _context.SaveChangesAsync();

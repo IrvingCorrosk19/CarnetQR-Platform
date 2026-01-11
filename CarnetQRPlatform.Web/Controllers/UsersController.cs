@@ -418,5 +418,98 @@ public class UsersController : Controller
         var errors = string.Join(" ", result.Errors.Select(e => e.Description));
         return Json(new { success = false, message = errors });
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(string id)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Usuario no encontrado." });
+                }
+                return NotFound();
+            }
+
+            // VALIDACIONES antes de eliminar
+            var errors = new List<string>();
+
+            // No puede eliminarse a sí mismo
+            if (user.Id == _userManager.GetUserId(User))
+            {
+                errors.Add("No puede eliminar su propio usuario.");
+            }
+
+            // Protección adicional para SuperAdmin (opcional, pero recomendado)
+            var userRoles = await _userManager.GetRolesAsync(user);
+            if (userRoles.Contains(Roles.SuperAdmin))
+            {
+                errors.Add("No se puede eliminar un usuario SuperAdmin.");
+            }
+
+            if (errors.Count > 0)
+            {
+                var errorMsg = string.Join(" ", errors);
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = errorMsg });
+                }
+                TempData["ErrorMessage"] = errorMsg;
+                return RedirectToAction(nameof(Index));
+            }
+
+            // Registrar auditoría antes de eliminar
+            if (user.InstitutionId.HasValue)
+            {
+                var currentUserId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    user.InstitutionId.Value,
+                    currentUserId,
+                    "DELETE",
+                    "AppUser",
+                    user.Id,
+                    new Dictionary<string, object> { { "Email", user.Email ?? "" }, { "Roles", string.Join(", ", userRoles) } });
+            }
+
+            // Eliminar usuario
+            var result = await _userManager.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = true, message = "Usuario eliminado exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+                }
+
+                TempData["SuccessMessage"] = "Usuario eliminado exitosamente.";
+            }
+            else
+            {
+                var errorMsg = string.Join(" ", result.Errors.Select(e => e.Description));
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = $"Error al eliminar el usuario: {errorMsg}" });
+                }
+                TempData["ErrorMessage"] = $"Error al eliminar el usuario: {errorMsg}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting user");
+            var errorMsg = $"Error al eliminar el usuario: {ex.Message}";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            TempData["ErrorMessage"] = errorMsg;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
 }
 

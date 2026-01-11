@@ -9,5 +9,6 @@ public interface IEntityProfileService
     Task<EntityProfile> CreateAsync(EntityProfile entityProfile);
     Task<EntityProfile> UpdateAsync(EntityProfile entityProfile);
     Task<bool> DeleteAsync(Guid id);
+    Task<bool> ToggleActiveAsync(Guid id);
 }
 

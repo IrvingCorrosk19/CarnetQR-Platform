@@ -200,5 +200,69 @@ public class EventsController : Controller
             return RedirectToAction(nameof(Index));
         }
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        try
+        {
+            var eventRecord = await _eventService.GetByIdAsync(id);
+            if (eventRecord == null)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Evento no encontrado." });
+                }
+                return NotFound();
+            }
+
+            var institutionId = eventRecord.InstitutionId;
+            var eventId = eventRecord.Id;
+            var deleted = await _eventService.DeleteAsync(id);
+
+            if (deleted)
+            {
+                // Registrar auditoría
+                var userId = _userManager.GetUserId(User);
+                await _auditService.LogActionAsync(
+                    institutionId,
+                    userId,
+                    "DELETE",
+                    "EventRecord",
+                    eventId.ToString(),
+                    new Dictionary<string, object> { { "ScheduledAt", eventRecord.ScheduledAt }, { "Status", eventRecord.Status.ToString() } });
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = true, message = "Evento eliminado exitosamente.", redirectUrl = Url.Action(nameof(Index)) });
+                }
+
+                TempData["SuccessMessage"] = "Evento eliminado exitosamente.";
+            }
+            else
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "No se pudo eliminar el evento." });
+                }
+                TempData["ErrorMessage"] = "No se pudo eliminar el evento.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting event");
+            var errorMsg = $"Error al eliminar el evento: {ex.Message}";
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+
+            TempData["ErrorMessage"] = errorMsg;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
 }
 

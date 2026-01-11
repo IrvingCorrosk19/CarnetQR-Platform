@@ -161,5 +161,18 @@ public class EntityProfileService : IEntityProfileService
         
         return true;
     }
+
+    public async Task<bool> ToggleActiveAsync(Guid id)
+    {
+        var entity = await GetByIdAsync(id);
+        if (entity == null) return false;
+
+        entity.IsActive = !entity.IsActive;
+        entity.UpdatedAt = DateTime.UtcNow;
+        _context.EntityProfiles.Update(entity);
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
 }
 
