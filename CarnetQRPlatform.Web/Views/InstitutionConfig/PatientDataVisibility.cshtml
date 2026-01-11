@@ -1,6 +1,6 @@
 @model CarnetQRPlatform.Domain.Entities.Institution
 @{
-    ViewData["Title"] = "Configuración de Visibilidad de Datos del Paciente";
+    ViewData["Title"] = "Configuración de Visibilidad de Datos de la Entidad";
     var availableFields = ViewBag.AvailableFields as List<SelectListItem> ?? new List<SelectListItem>();
 }
 
@@ -8,7 +8,7 @@
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-eye me-2"></i>
-            Configuración de Visibilidad de Datos del Paciente
+            Configuración de Visibilidad de Datos de la Entidad
         </h3>
         <div class="card-tools">
             <a href="@Url.Action("Index", "InstitutionConfig")" class="btn btn-secondary btn-sm">
@@ -32,13 +32,13 @@
             <div class="alert alert-warning">
                 <h6><i class="fas fa-exclamation-triangle me-2"></i>Configuración Global</h6>
                 <p class="mb-0">
-                    Esta configuración se aplica a todos los pacientes de la institución. 
-                    Los administradores pueden sobrescribir esta configuración para pacientes específicos desde la edición de cada entidad.
+                    Esta configuración se aplica a todas las entidades de la institución. 
+                    Los administradores pueden sobrescribir esta configuración para entidades específicas desde la edición de cada entidad.
                 </p>
             </div>
 
             <div class="form-group mb-4">
-                <label class="form-label"><strong>Seleccione qué datos del paciente se mostrarán en el QR público:</strong></label>
+                <label class="form-label"><strong>Seleccione qué datos de la entidad se mostrarán en el QR público:</strong></label>
                 
                 <div class="row">
                     @foreach (var field in availableFields)
@@ -64,7 +64,7 @@
 
                 <small class="form-text text-muted">
                     Los campos marcados se mostrarán cuando alguien escanee el código QR del carnet.
-                    Los campos no marcados permanecerán ocultos para proteger la privacidad del paciente.
+                    Los campos no marcados permanecerán ocultos para proteger la privacidad de la entidad.
                 </small>
             </div>
 
@@ -74,9 +74,9 @@
                 </div>
                 <div class="card-body">
                     <ul class="mb-0">
-                        <li>Esta es una configuración <strong>global</strong> que se aplica a todos los pacientes.</li>
-                        <li>Puede configurar la visibilidad <strong>por paciente</strong> desde la edición de cada entidad.</li>
-                        <li>La configuración por paciente <strong>sobrescribe</strong> esta configuración global.</li>
+                        <li>Esta es una configuración <strong>global</strong> que se aplica a todas las entidades.</li>
+                        <li>Puede configurar la visibilidad <strong>por entidad</strong> desde la edición de cada entidad.</li>
+                        <li>La configuración por entidad <strong>sobrescribe</strong> esta configuración global.</li>
                         <li>El <strong>número de carnet</strong> siempre se muestra (no configurable).</li>
                     </ul>
                 </div>

@@ -29,7 +29,7 @@
                 </div>
             }
 
-            <!-- Foto del Paciente -->
+            <!-- Foto de la Entidad -->
             <div class="form-group mb-4">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="photoEnabled" name="photoEnabled" @(Model.PhotoEnabled ? "checked" : "")>
@@ -38,7 +38,7 @@
                     </label>
                 </div>
                 <small class="form-text text-muted">
-                    Si está habilitado, los usuarios internos podrán cargar la foto del paciente al crear o editar entidades.
+                    Si está habilitado, los usuarios internos podrán cargar la foto de la entidad al crear o editar entidades.
                 </small>
             </div>
 
@@ -56,7 +56,7 @@
                 <div class="form-check">
                     <input class="form-check-input" type="radio" name="qrPublicDisplayMode" id="qrModePatientName" value="1" @(Model.QrPublicDisplayMode == CarnetQRPlatform.Domain.Entities.QrPublicDisplayMode.PatientName ? "checked" : "")>
                     <label class="form-check-label" for="qrModePatientName">
-                        Mostrar Nombre del Paciente
+                        Mostrar Nombre de la Entidad
                     </label>
                 </div>
                 <small class="form-text text-muted">

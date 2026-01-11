@@ -15,8 +15,8 @@ public class EntityProfile : BaseEntity, ITenantEntity
     public Dictionary<string, object> CustomFields { get; set; } = new();
     public bool IsActive { get; set; } = true;
     
-    // Configuración de visibilidad de datos del paciente (por paciente, sobrescribe la global)
-    public Dictionary<string, bool>? PatientDataVisibilityOverride { get; set; } // Configuración específica por paciente
+    // Configuración de visibilidad de datos de la entidad (por entidad, sobrescribe la global)
+    public Dictionary<string, bool>? PatientDataVisibilityOverride { get; set; } // Configuración específica por entidad
 
     public Institution Institution { get; set; } = null!;
     public ICollection<Card> Cards { get; set; } = new List<Card>();

@@ -96,8 +96,8 @@
                                     @* Mostrar foto si existe, si no mostrar QR *@
                                     @if (!string.IsNullOrEmpty(Model.EntityProfile?.PhotoPath))
                                     {
-                                        <img src="@Model.EntityProfile.PhotoPath" alt="Foto del Paciente" style="max-width: 150px; max-height: 180px; border: 2px solid #dee2e6; border-radius: 8px; padding: 5px; background: white; object-fit: cover;">
-                                        <p class="text-muted small mt-2 mb-0">Foto del Paciente</p>
+                                        <img src="@Model.EntityProfile.PhotoPath" alt="Foto de la Entidad" style="max-width: 150px; max-height: 180px; border: 2px solid #dee2e6; border-radius: 8px; padding: 5px; background: white; object-fit: cover;">
+                                        <p class="text-muted small mt-2 mb-0">Foto de la Entidad</p>
                                     }
                                     else if (!string.IsNullOrEmpty(qrCodeBase64))
                                     {
@@ -209,7 +209,7 @@
                                     <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" id="showPhoto" @if (!string.IsNullOrEmpty(Model.EntityProfile?.PhotoPath)) { <text>checked</text> }>
                                         <label class="form-check-label" for="showPhoto">
-                                            <i class="fas fa-camera me-1"></i>Mostrar Foto del Paciente
+                                            <i class="fas fa-camera me-1"></i>Mostrar Foto de la Entidad
                                         </label>
                                         @if (string.IsNullOrEmpty(Model.EntityProfile?.PhotoPath))
                                         {
