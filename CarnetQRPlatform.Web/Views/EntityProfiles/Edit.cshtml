@@ -175,18 +175,52 @@
                 }
             });
 
+            console.log('🔵 [FRONTEND] Página de edición cargada. EntityId=@Model.Id, IsSuperAdmin=@isSuperAdmin, InstitutionId=@Model.InstitutionId');
+            
+            @if (isSuperAdmin)
+            {
+                <text>
+                console.log('🔵 [FRONTEND] SuperAdmin detectado. Dropdown de instituciones disponible');
+                $('#InstitutionId').on('change', function() {
+                    console.log('🔵 [FRONTEND] Institución seleccionada cambiada:', $(this).val(), $(this).find('option:selected').text());
+                });
+                </text>
+            }
+            else
+            {
+                <text>
+                var hiddenInstitutionId = $('input[name="InstitutionId"]').val();
+                console.log('🔵 [FRONTEND] Usuario no-SuperAdmin. InstitutionId oculto:', hiddenInstitutionId);
+                </text>
+            }
+            
             $('#editEntityForm').on('submit', function(e) {
                 e.preventDefault();
                 
+                console.log('🟢 [FRONTEND] Formulario de edición enviado');
+                
                 var form = this;
                 var formData = new FormData(form);
+                
+                // Log de todos los datos del formulario
+                console.log('🟢 [FRONTEND] Datos del formulario:');
+                for (var pair of formData.entries()) {
+                    if (pair[0] === 'PhotoFile') {
+                        console.log('  -', pair[0] + ':', pair[1].name, '(' + pair[1].size + ' bytes)');
+                    } else {
+                        console.log('  -', pair[0] + ':', pair[1]);
+                    }
+                }
                 
                 @if (isSuperAdmin)
                 {
                     <text>
                     // Validar que se haya seleccionado una institución (solo para SuperAdmin)
                     var institutionId = $('#InstitutionId').val();
+                    console.log('🟢 [FRONTEND] SuperAdmin - Validando InstitutionId:', institutionId);
+                    
                     if (!institutionId || institutionId === '') {
+                        console.error('🔴 [FRONTEND] SuperAdmin no seleccionó institución');
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -195,6 +229,7 @@
                         $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                         return false;
                     }
+                    console.log('🟢 [FRONTEND] Institución válida seleccionada:', institutionId);
                     </text>
                 }
                 else
@@ -202,9 +237,15 @@
                     <text>
                     // Asegurar que InstitutionId se envíe (para usuarios no-SuperAdmin)
                     var institutionId = $('input[name="InstitutionId"]').val();
+                    console.log('🟢 [FRONTEND] Usuario no-SuperAdmin - InstitutionId:', institutionId);
+                    
                     if (!institutionId || institutionId === '') {
                         // Si no está en el formData, agregarlo desde el modelo
-                        formData.append('InstitutionId', '@Model.InstitutionId.ToString()');
+                        var modelInstitutionId = '@Model.InstitutionId.ToString()';
+                        console.log('🟢 [FRONTEND] InstitutionId vacío, agregando desde modelo:', modelInstitutionId);
+                        formData.append('InstitutionId', modelInstitutionId);
+                    } else {
+                        console.log('🟢 [FRONTEND] InstitutionId ya presente en formulario:', institutionId);
                     }
                     </text>
                 }
@@ -215,9 +256,12 @@
                 photoError.hide().text('');
                 
                 if (photoFile) {
+                    console.log('🟢 [FRONTEND] Foto seleccionada:', photoFile.name, photoFile.size, 'bytes, tipo:', photoFile.type);
+                    
                     // Validar tipo de archivo
                     var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
                     if (!allowedTypes.includes(photoFile.type)) {
+                        console.error('🔴 [FRONTEND] Tipo de archivo no permitido:', photoFile.type);
                         photoError.text('❌ Solo se permiten archivos de imagen (JPG, JPEG, PNG, GIF).').show();
                         $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                         return false;
@@ -225,15 +269,18 @@
                     
                     // Validar tamaño (5MB máximo)
                     if (photoFile.size > 5 * 1024 * 1024) {
+                        console.error('🔴 [FRONTEND] Archivo excede tamaño máximo:', photoFile.size, 'bytes');
                         photoError.text('❌ El archivo no puede exceder 5MB.').show();
                         $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                         return false;
                     }
                     
-                    console.log('Foto seleccionada:', photoFile.name, photoFile.size, 'bytes');
+                    console.log('🟢 [FRONTEND] Foto válida, se enviará al servidor');
                 } else {
-                    console.log('No se seleccionó nueva foto - se preservará la foto actual');
+                    console.log('🟢 [FRONTEND] No se seleccionó nueva foto - se preservará la foto actual');
                 }
+                
+                console.log('🟢 [FRONTEND] Enviando petición AJAX a:', $(form).attr('action'));
                 
                 // Usar FormData para envío con archivos
                 $.ajax({
@@ -243,11 +290,15 @@
                     processData: false,
                     contentType: false,
                     beforeSend: function() {
+                        console.log('🟢 [FRONTEND] Petición AJAX iniciada');
                         // Mostrar loading
                         $(form).find('button[type="submit"]').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Guardando...');
                     },
                     success: function(response) {
+                        console.log('🟢 [FRONTEND] Respuesta recibida del servidor:', response);
+                        
                         if (response.success) {
+                            console.log('✅ [FRONTEND] Actualización exitosa');
                             Swal.fire({
                                 icon: 'success',
                                 title: '¡Éxito!',
@@ -258,6 +309,7 @@
                                 window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
                             });
                         } else {
+                            console.error('🔴 [FRONTEND] Error en respuesta:', response.message);
                             var errorMsg = response.message || 'Error al actualizar la entidad';
                             if (response.errors && response.errors.PhotoFile) {
                                 photoError.text('❌ ' + response.errors.PhotoFile.join(', ')).show();
@@ -270,7 +322,14 @@
                             $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Guardar Cambios');
                         }
                     },
-                    error: function(xhr) {
+                    error: function(xhr, status, error) {
+                        console.error('🔴 [FRONTEND] Error en petición AJAX:', {
+                            status: status,
+                            error: error,
+                            statusCode: xhr.status,
+                            responseText: xhr.responseText
+                        });
+                        
                         var response = xhr.responseJSON;
                         var errorMsg = response?.message || 'Error al actualizar la entidad';
                         

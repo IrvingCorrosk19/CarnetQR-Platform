@@ -255,22 +255,40 @@ public class EntityProfilesController : Controller
 
     public async Task<IActionResult> Edit(Guid id)
     {
+        _logger.LogInformation("[EntityProfiles/Edit GET] Iniciando edición de entidad. EntityId={EntityId}, User={User}, IsSuperAdmin={IsSuperAdmin}", 
+            id, User.Identity?.Name, User.IsInRole(Roles.SuperAdmin));
+        
         var entity = await _entityProfileService.GetByIdAsync(id);
         if (entity == null)
         {
+            _logger.LogWarning("[EntityProfiles/Edit GET] Entidad no encontrada. EntityId={EntityId}", id);
             return NotFound();
         }
+
+        var entityName = $"{entity.FirstName} {entity.LastName}";
+        _logger.LogInformation("[EntityProfiles/Edit GET] Entidad encontrada. EntityId={EntityId}, InstitutionId={InstitutionId}, Name={Name}", 
+            entity.Id, entity.InstitutionId, entityName);
 
         // Si es SuperAdmin, cargar lista de instituciones para seleccionar
         if (User.IsInRole(Roles.SuperAdmin))
         {
             var institutions = await _institutionService.GetAllAsync();
-            ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            var activeInstitutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
+            ViewBag.Institutions = activeInstitutions;
+            _logger.LogInformation("[EntityProfiles/Edit GET] SuperAdmin detectado. Instituciones cargadas: {Count}", activeInstitutions.Count);
+        }
+        else
+        {
+            _logger.LogInformation("[EntityProfiles/Edit GET] Usuario no-SuperAdmin. InstitutionId se preservará automáticamente: {InstitutionId}", entity.InstitutionId);
         }
 
         // Obtener institución para verificar PhotoEnabled
         var institution = await _institutionService.GetByIdAsync(entity.InstitutionId);
-        ViewBag.PhotoEnabled = institution?.PhotoEnabled ?? false;
+        var photoEnabled = institution?.PhotoEnabled ?? false;
+        ViewBag.PhotoEnabled = photoEnabled;
+        
+        _logger.LogInformation("[EntityProfiles/Edit GET] PhotoEnabled={PhotoEnabled} para InstitutionId={InstitutionId}", 
+            photoEnabled, entity.InstitutionId);
 
         return View(entity);
     }
@@ -279,8 +297,12 @@ public class EntityProfilesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(Guid id, EntityProfile entityProfile)
     {
+        _logger.LogInformation("[EntityProfiles/Edit POST] Iniciando actualización de entidad. EntityId={EntityId}, User={User}, IsSuperAdmin={IsSuperAdmin}, ReceivedInstitutionId={ReceivedInstitutionId}", 
+            id, User.Identity?.Name, User.IsInRole(Roles.SuperAdmin), entityProfile.InstitutionId);
+        
         if (id != entityProfile.Id)
         {
+            _logger.LogWarning("[EntityProfiles/Edit POST] ID no coincide. Expected={Expected}, Received={Received}", id, entityProfile.Id);
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
                 return Json(new { success = false, message = "ID no coincide." });
@@ -292,6 +314,7 @@ public class EntityProfilesController : Controller
         var existingEntity = await _entityProfileService.GetByIdAsync(id);
         if (existingEntity == null)
         {
+            _logger.LogWarning("[EntityProfiles/Edit POST] Entidad no encontrada. EntityId={EntityId}", id);
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
                 return Json(new { success = false, message = "Entidad no encontrada." });
@@ -299,15 +322,22 @@ public class EntityProfilesController : Controller
             return NotFound();
         }
 
+        _logger.LogInformation("[EntityProfiles/Edit POST] Entidad existente encontrada. ExistingInstitutionId={ExistingInstitutionId}, ReceivedInstitutionId={ReceivedInstitutionId}", 
+            existingEntity.InstitutionId, entityProfile.InstitutionId);
+
         // Remover InstitutionId del ModelState para evitar validación automática
         // Lo validaremos manualmente según el rol
         ModelState.Remove(nameof(entityProfile.InstitutionId));
+        _logger.LogInformation("[EntityProfiles/Edit POST] InstitutionId removido del ModelState para validación manual");
         
         // Si es SuperAdmin, validar que haya seleccionado una institución
         if (User.IsInRole(Roles.SuperAdmin))
         {
+            _logger.LogInformation("[EntityProfiles/Edit POST] SuperAdmin detectado. Validando InstitutionId={InstitutionId}", entityProfile.InstitutionId);
+            
             if (entityProfile.InstitutionId == Guid.Empty)
             {
+                _logger.LogWarning("[EntityProfiles/Edit POST] SuperAdmin no seleccionó institución. InstitutionId={InstitutionId}", entityProfile.InstitutionId);
                 ModelState.AddModelError(nameof(entityProfile.InstitutionId), "Debe seleccionar una empresa.");
                 
                 // Recargar instituciones para el dropdown
@@ -325,6 +355,10 @@ public class EntityProfilesController : Controller
             var selectedInstitution = await _institutionService.GetByIdAsync(entityProfile.InstitutionId);
             if (selectedInstitution == null || !selectedInstitution.IsActive)
             {
+                var exists = selectedInstitution != null;
+                var isActive = selectedInstitution?.IsActive ?? false;
+                _logger.LogWarning("[EntityProfiles/Edit POST] Institución no existe o está inactiva. InstitutionId={InstitutionId}, Exists={Exists}, IsActive={IsActive}", 
+                    entityProfile.InstitutionId, exists, isActive);
                 ModelState.AddModelError(nameof(entityProfile.InstitutionId), "La empresa seleccionada no existe o está inactiva.");
                 
                 var institutions = await _institutionService.GetAllAsync();
@@ -336,12 +370,18 @@ public class EntityProfilesController : Controller
                 }
                 return View(entityProfile);
             }
+            
+            _logger.LogInformation("[EntityProfiles/Edit POST] Institución válida. InstitutionId={InstitutionId}, Name={Name}", 
+                selectedInstitution.Id, selectedInstitution.Name);
         }
         else
         {
             // InstitutionId se establece automáticamente desde el tenant
             // Preservar InstitutionId del modelo existente
+            var oldInstitutionId = entityProfile.InstitutionId;
             entityProfile.InstitutionId = existingEntity.InstitutionId;
+            _logger.LogInformation("[EntityProfiles/Edit POST] Usuario no-SuperAdmin. InstitutionId preservado: {OldInstitutionId} -> {NewInstitutionId}", 
+                oldInstitutionId, entityProfile.InstitutionId);
         }
         
         ModelState.Remove(nameof(entityProfile.PhotoPath)); // PhotoPath se maneja por separado
@@ -431,8 +471,16 @@ public class EntityProfilesController : Controller
             entityProfile.PhotoPath = currentPhotoPath;
         }
 
+        // Log del estado del ModelState
         if (!ModelState.IsValid)
         {
+            var modelErrors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .Select(x => $"{x.Key}: {string.Join(", ", x.Value.Errors.Select(e => e.ErrorMessage))}")
+                .ToList();
+            var errorsString = string.Join(" | ", modelErrors);
+            _logger.LogWarning("[EntityProfiles/Edit POST] ModelState inválido. Errores: {Errors}", errorsString);
+            
             // Si hay errores, recargar ViewBag necesario para la vista
             if (User.IsInRole(Roles.SuperAdmin))
             {
@@ -467,9 +515,15 @@ public class EntityProfilesController : Controller
             // Log final antes de actualizar
             _logger.LogInformation("Actualizando EntityProfile {Id} con PhotoPath: {PhotoPath}", entityProfile.Id, entityProfile.PhotoPath ?? "null");
             
+            var photoPathValue = entityProfile.PhotoPath ?? "null";
+            _logger.LogInformation("[EntityProfiles/Edit POST] ModelState válido. Preparando actualización. EntityId={EntityId}, InstitutionId={InstitutionId}, PhotoPath={PhotoPath}", 
+                entityProfile.Id, entityProfile.InstitutionId, photoPathValue);
+            
             var updated = await _entityProfileService.UpdateAsync(entityProfile);
             
-            _logger.LogInformation("EntityProfile {Id} actualizado exitosamente. PhotoPath guardado: {PhotoPath}", updated.Id, updated.PhotoPath ?? "null");
+            var updatedPhotoPath = updated.PhotoPath ?? "null";
+            _logger.LogInformation("[EntityProfiles/Edit POST] EntityProfile actualizado exitosamente. EntityId={Id}, InstitutionId={InstitutionId}, PhotoPath={PhotoPath}", 
+                updated.Id, updated.InstitutionId, updatedPhotoPath);
             
             // Registrar auditoría
             var userId = _userManager.GetUserId(User);
@@ -491,7 +545,9 @@ public class EntityProfilesController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating entity profile {Id}. PhotoPath intentado: {PhotoPath}", entityProfile.Id, entityProfile.PhotoPath ?? "null");
+            var errorPhotoPath = entityProfile.PhotoPath ?? "null";
+            _logger.LogError(ex, "[EntityProfiles/Edit POST] Error actualizando entidad. EntityId={Id}, InstitutionId={InstitutionId}, PhotoPath={PhotoPath}, Error={Error}", 
+                entityProfile.Id, entityProfile.InstitutionId, errorPhotoPath, ex.Message);
             var errorMsg = $"Error al actualizar la entidad: {ex.Message}";
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
