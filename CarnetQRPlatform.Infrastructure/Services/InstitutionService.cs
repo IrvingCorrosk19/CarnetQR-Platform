@@ -136,8 +136,8 @@ public class InstitutionService : IInstitutionService
         // VALIDACIONES: Verificar relaciones antes de eliminar
         var errors = new List<string>();
 
-        // Verificar usuarios asociados
-        var hasUsers = await _context.Users
+        // Verificar usuarios asociados (AppUser tiene InstitutionId nullable)
+        var hasUsers = await _context.Set<Domain.Entities.AppUser>()
             .AnyAsync(u => u.InstitutionId == id);
         if (hasUsers)
         {
