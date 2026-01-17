@@ -21,7 +21,12 @@ if (!Directory.Exists(dataProtectionPath))
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
     .SetApplicationName("CarnetQRPlatform")
-    .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
+    .SetDefaultKeyLifetime(TimeSpan.FromDays(90))
+    .UseCryptographicAlgorithms(new Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationModel.AuthenticatedEncryptorConfiguration()
+    {
+        EncryptionAlgorithm = Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.EncryptionAlgorithm.AES_256_CBC,
+        ValidationAlgorithm = Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ValidationAlgorithm.HMACSHA256
+    });
 
 // 👇 Forwarded headers (OBLIGATORIO en Docker / VPS)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
