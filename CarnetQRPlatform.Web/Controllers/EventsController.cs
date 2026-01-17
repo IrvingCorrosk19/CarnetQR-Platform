@@ -62,8 +62,36 @@ public class EventsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(EventRecord eventRecord)
     {
+        _logger.LogInformation("[Events/Create POST] Iniciando creación de evento. EntityProfileId={EntityProfileId}, User={User}, IsSuperAdmin={IsSuperAdmin}", 
+            eventRecord.EntityProfileId, User.Identity?.Name, User.IsInRole(Roles.SuperAdmin));
+        
+        // Remover InstitutionId e Institution del ModelState para evitar validación automática
+        // Lo estableceremos desde el EntityProfile seleccionado
+        ModelState.Remove(nameof(eventRecord.InstitutionId));
+        ModelState.Remove(nameof(eventRecord.Institution)); // Remover también la propiedad de navegación
+        ModelState.Remove(nameof(eventRecord.EntityProfile)); // Remover la propiedad de navegación EntityProfile
+        
+        // Validar EntityProfileId antes de continuar
+        if (eventRecord.EntityProfileId == Guid.Empty)
+        {
+            _logger.LogWarning("[Events/Create POST] EntityProfileId está vacío.");
+            await LoadEntityProfilesForView();
+            
+            var errorMsg = "Debe seleccionar una entidad.";
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+            
+            ModelState.AddModelError(nameof(eventRecord.EntityProfileId), errorMsg);
+            return View(eventRecord);
+        }
+        
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("[Events/Create POST] ModelState inválido. Errores: {Errors}", 
+                string.Join(" | ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            
             // Recargar entidades si hay error de validación
             await LoadEntityProfilesForView();
             
@@ -77,6 +105,30 @@ public class EventsController : Controller
 
         try
         {
+            // Obtener EntityProfile para establecer InstitutionId
+            _logger.LogInformation("[Events/Create POST] Obteniendo EntityProfile. EntityProfileId={EntityProfileId}", eventRecord.EntityProfileId);
+            var entityProfile = await _entityProfileService.GetByIdAsync(eventRecord.EntityProfileId);
+            if (entityProfile == null)
+            {
+                _logger.LogWarning("[Events/Create POST] EntityProfile no encontrado. EntityProfileId={EntityProfileId}", eventRecord.EntityProfileId);
+                await LoadEntityProfilesForView();
+                
+                var errorMsg = "La entidad seleccionada no existe.";
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = errorMsg });
+                }
+                
+                ModelState.AddModelError(nameof(eventRecord.EntityProfileId), errorMsg);
+                return View(eventRecord);
+            }
+            
+            // Establecer InstitutionId desde el EntityProfile
+            // Esto es necesario especialmente para SuperAdmin (el servicio requiere InstitutionId)
+            eventRecord.InstitutionId = entityProfile.InstitutionId;
+            _logger.LogInformation("[Events/Create POST] InstitutionId establecido desde EntityProfile. InstitutionId={InstitutionId}, EntityProfileId={EntityProfileId}, EntityName={EntityName}", 
+                eventRecord.InstitutionId, eventRecord.EntityProfileId, $"{entityProfile.FirstName} {entityProfile.LastName}");
+            
             var created = await _eventService.CreateAsync(eventRecord);
             
             // Registrar auditoría
@@ -99,8 +151,10 @@ public class EventsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating event");
-            var errorMsg = "Error al crear el evento.";
+            _logger.LogError(ex, "[Events/Create POST] Error al crear evento. EntityProfileId={EntityProfileId}, InstitutionId={InstitutionId}", 
+                eventRecord.EntityProfileId, eventRecord.InstitutionId);
+            
+            var errorMsg = $"Error al crear el evento: {ex.Message}";
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {

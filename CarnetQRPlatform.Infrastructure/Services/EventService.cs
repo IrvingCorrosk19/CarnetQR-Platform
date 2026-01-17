@@ -53,35 +53,58 @@ public class EventService : IEventService
     {
         // MULTI-TENANT ESTRICTO: Obtener tenant del contexto actual
         var tenantId = _tenantProvider.GetCurrentTenantId();
-        
-        // Si no hay tenant y no es SuperAdmin, rechazar
-        if (!tenantId.HasValue && !_tenantProvider.IsSuperAdmin())
-        {
-            throw new InvalidOperationException("Cannot create event record without tenant context");
-        }
+        var isSuperAdmin = _tenantProvider.IsSuperAdmin();
         
         // Si es SuperAdmin, debe proporcionar InstitutionId explícitamente
-        if (_tenantProvider.IsSuperAdmin() && eventRecord.InstitutionId == Guid.Empty)
+        if (isSuperAdmin)
         {
-            throw new InvalidOperationException("SuperAdmin must specify InstitutionId when creating event records");
+            if (eventRecord.InstitutionId == Guid.Empty)
+            {
+                throw new InvalidOperationException("SuperAdmin must specify InstitutionId when creating event records");
+            }
+            // Para SuperAdmin, usar el InstitutionId que viene del evento (ya establecido desde EntityProfile)
+            // NO sobrescribir con tenantId porque SuperAdmin puede crear eventos para cualquier institución
         }
-        
-        // FORZAR InstitutionId desde el tenant (ignorar cualquier valor que venga del request)
-        if (tenantId.HasValue)
+        else
         {
+            // Si no hay tenant y no es SuperAdmin, rechazar
+            if (!tenantId.HasValue)
+            {
+                throw new InvalidOperationException("Cannot create event record without tenant context");
+            }
+            
+            // Para usuarios no-SuperAdmin, FORZAR InstitutionId desde el tenant
+            // Esto garantiza que solo puedan crear eventos para su propia institución
             eventRecord.InstitutionId = tenantId.Value;
         }
 
-        // VALIDAR que EntityProfile pertenece al mismo tenant
-        if (tenantId.HasValue)
+        // VALIDAR que EntityProfile existe y pertenece a la institución correcta
+        var entityProfile = await _context.EntityProfiles
+            .FirstOrDefaultAsync(ep => ep.Id == eventRecord.EntityProfileId);
+        
+        if (entityProfile == null)
         {
-            var entityProfile = await _context.EntityProfiles
-                .FirstOrDefaultAsync(ep => ep.Id == eventRecord.EntityProfileId && ep.InstitutionId == tenantId.Value);
-            
-            if (entityProfile == null)
+            throw new InvalidOperationException(
+                $"Entity profile with ID {eventRecord.EntityProfileId} not found");
+        }
+        
+        // Para usuarios no-SuperAdmin, validar que EntityProfile pertenece al mismo tenant
+        if (!isSuperAdmin && tenantId.HasValue)
+        {
+            if (entityProfile.InstitutionId != tenantId.Value)
             {
                 throw new InvalidOperationException(
-                    "Entity profile not found or does not belong to the current tenant");
+                    "Entity profile does not belong to the current tenant");
+            }
+        }
+        
+        // Para SuperAdmin, validar que el InstitutionId del evento coincide con el del EntityProfile
+        if (isSuperAdmin)
+        {
+            if (entityProfile.InstitutionId != eventRecord.InstitutionId)
+            {
+                throw new InvalidOperationException(
+                    $"Entity profile belongs to institution {entityProfile.InstitutionId} but event is being created for institution {eventRecord.InstitutionId}");
             }
         }
 
