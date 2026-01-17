@@ -6,8 +6,19 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using CarnetQRPlatform.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 👇 Forwarded headers (OBLIGATORIO en Docker / VPS)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Configure Serilog
 builder.Host.UseSerilog((context, configuration) =>
@@ -27,6 +38,9 @@ builder.Services.AddScoped<CarnetQRPlatform.Application.Services.ICacheService, 
 builder.Services.AddScoped<CarnetQRPlatform.Web.Services.QrCodeService>();
 
 var app = builder.Build();
+
+// 👇 USAR forwarded headers (ANTES de cualquier otro middleware)
+app.UseForwardedHeaders();
 
 // Initialize database
 using (var scope = app.Services.CreateScope())
@@ -59,7 +73,8 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// 👇 NO FORZAR HTTPS (comentado temporalmente para Docker/HTTP)
+// app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseSerilogRequestLogging();
