@@ -7,8 +7,21 @@ using Serilog;
 using CarnetQRPlatform.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 👇 DataProtection: Configurar para usar directorio persistente en Docker
+var dataProtectionPath = Environment.GetEnvironmentVariable("ASPNETCORE_DATAPROTECTION_PATH") ?? "/app/dataprotection-keys";
+if (!Directory.Exists(dataProtectionPath))
+{
+    Directory.CreateDirectory(dataProtectionPath);
+}
+
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
+    .SetApplicationName("CarnetQRPlatform")
+    .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
 
 // 👇 Forwarded headers (OBLIGATORIO en Docker / VPS)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
