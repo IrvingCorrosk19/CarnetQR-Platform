@@ -74,15 +74,12 @@ public class CarnetController : Controller
         // Crear configuración inicial con valores por defecto
         var config = new PrintCardConfig();
         
-        // CONFIGURACIÓN POR DEFECTO PRIORITARIA: foto en frente, QR en trasera (si hay foto)
-        // Esta se aplica primero para que tenga prioridad sobre el template
-        if (hasPhoto)
-        {
-            config.ShowPhoto = true;
-            config.DoubleSided = true;
-            config.QrOnBack = true;
-            config.ShowQrCode = false; // No mostrar QR en el frente (va en la trasera)
-        }
+        // CONFIGURACIÓN POR DEFECTO PRIORITARIA: siempre mostrar foto (o placeholder) en frente, QR en trasera
+        // Si hay foto, mostrarla; si no, mostrar placeholder agradable
+        config.ShowPhoto = true; // Siempre mostrar área de foto (con foto real o placeholder)
+        config.DoubleSided = true; // Siempre mostrar dos caras (frente con foto/placeholder, reverso con QR)
+        config.QrOnBack = true; // QR siempre en la trasera
+        config.ShowQrCode = false; // No mostrar QR en el frente (va en la trasera)
         
         // Aplicar configuraciones desde template si existe (puede sobrescribir algunas, pero respetamos la prioridad de foto/QR)
         if (template != null && template.TemplateConfig != null && template.TemplateConfig.Count > 0)
@@ -135,19 +132,16 @@ public class CarnetController : Controller
         ApplyQueryStringOverrides(viewModel.Config);
         
         // VERIFICACIÓN FINAL Y ASEGURAR COHERENCIA:
-        // Si hay foto, priorizar configuración: foto en frente, QR en trasera
-        if (!string.IsNullOrEmpty(viewModel.PhotoPath))
+        // Siempre mostrar área de foto (con foto real o placeholder), QR siempre en trasera
+        viewModel.Config.ShowPhoto = true; // Siempre mostrar área de foto
+        
+        // Asegurar configuración de dos caras: foto/placeholder en frente, QR en trasera
+        // (solo si no se especificó explícitamente via query string lo contrario)
+        if (!Request.Query.ContainsKey("qrOnBack") && !Request.Query.ContainsKey("doubleSided"))
         {
-            viewModel.Config.ShowPhoto = true;
-            
-            // Asegurar que si hay foto, por defecto el QR vaya en la trasera
-            // (solo si no se especificó explícitamente via query string que no debe estar en la trasera)
-            if (!Request.Query.ContainsKey("qrOnBack") && !Request.Query.ContainsKey("doubleSided"))
-            {
-                viewModel.Config.DoubleSided = true;
-                viewModel.Config.QrOnBack = true;
-                viewModel.Config.ShowQrCode = false; // No mostrar QR en el frente
-            }
+            viewModel.Config.DoubleSided = true;
+            viewModel.Config.QrOnBack = true;
+            viewModel.Config.ShowQrCode = false; // No mostrar QR en el frente
         }
         
         // Asegurar coherencia general: si QrOnBack está activo, el QR no debe mostrarse en el frente

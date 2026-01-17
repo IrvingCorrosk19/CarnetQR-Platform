@@ -325,6 +325,34 @@
                 <text>box-shadow: 0 2px 6px rgba(0, 0, 0, @(config.ShadowOpacity * 0.8));</text>
             }
         }
+        
+        .carnet-photo .photo-placeholder {
+            width: @(config.PhotoWidth)mm;
+            height: @(config.PhotoHeight)mm;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid @config.PrimaryColor;
+            border-radius: @(config.BorderRadius / 2)mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10pt;
+            font-weight: bold;
+            @if (config.ShowShadow) {
+                <text>box-shadow: 0 2px 6px rgba(0, 0, 0, @(config.ShadowOpacity * 0.8));</text>
+            }
+        }
+        
+        .carnet-photo .photo-placeholder svg {
+            opacity: 0.8;
+            margin-bottom: 3px;
+        }
+        
+        .carnet-photo .photo-placeholder span {
+            font-size: 7pt;
+            opacity: 0.9;
+        }
 
         /* QR con posicionamiento y tamaño dinámico */
         .carnet-qr {
@@ -679,10 +707,23 @@
 
         <!-- Body -->
         <div class="carnet-body">
-            @if (config.ShowPhoto && !string.IsNullOrEmpty(Model.PhotoPath))
+            @if (config.ShowPhoto)
             {
                 <div class="carnet-photo">
-                    <img src="@Model.PhotoPath" alt="Foto">
+                    @if (!string.IsNullOrEmpty(Model.PhotoPath))
+                    {
+                        <img src="@Model.PhotoPath" alt="Foto">
+                    }
+                    else
+                    {
+                        @* Placeholder agradable cuando no hay foto *@
+                        <div class="photo-placeholder">
+                            <svg width="32" height="32" fill="white" viewBox="0 0 24 24">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                            <span>Sin Foto</span>
+                        </div>
+                    }
                 </div>
             }
             
