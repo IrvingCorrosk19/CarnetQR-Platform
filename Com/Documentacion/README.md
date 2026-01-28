@@ -35,17 +35,9 @@
    - **Incluye:** Instrucciones detalladas, datos de prueba predefinidos, qué buscar en cada paso
    - **Uso:** Para personas sin conocimiento técnico que ejecutan pruebas
 
-### 📊 Análisis y Arquitectura
-
-6. **[ANALISIS_COMPLETO_SISTEMA.md](./ANALISIS_COMPLETO_SISTEMA.md)**
-   - **Versión:** 1.0
-   - **Descripción:** Análisis exhaustivo y completo del sistema CarnetQR Platform
-   - **Incluye:** Arquitectura, modelo de datos, multi-tenancy, seguridad, funcionalidades, infraestructura, puntos fuertes, áreas de mejora, recomendaciones
-   - **Uso:** Para desarrolladores, arquitectos, y stakeholders técnicos que necesitan entender el sistema completo
-
 ### 🔐 Seguridad y Credenciales
 
-7. **[CREDENCIALES.md](./CREDENCIALES.md)**
+6. **[CREDENCIALES.md](./CREDENCIALES.md)**
    - **Descripción:** Documento con todas las contraseñas y credenciales del sistema
    - **Incluye:** SSH, PostgreSQL, usuarios de aplicación, usuarios de prueba
    - **⚠️ IMPORTANTE:** Este archivo contiene información sensible. NO subir a Git/GitHub
@@ -81,7 +73,6 @@
 | COMO_USAR_EL_MANUAL_PARA_OTRA_APP.md | ~400 líneas | Adaptación rápida |
 | PLAN_PRUEBAS_COMPLETO.md | ~1000 líneas | Testing técnico |
 | PLAN_PRUEBAS_DETALLADO.md | ~1500 líneas | Testing detallado |
-| ANALISIS_COMPLETO_SISTEMA.md | ~1200 líneas | Análisis técnico completo |
 | CREDENCIALES.md | ~100 líneas | Referencia rápida |
 
 ---
@@ -107,7 +98,6 @@
 - **17 de Enero, 2026:** Creación inicial de documentación
 - **17 de Enero, 2026:** Versión 2.0 del manual de despliegue (multi-app)
 - **17 de Enero, 2026:** Plan de pruebas detallado para testers sin conocimiento técnico
-- **17 de Enero, 2026:** Análisis completo del sistema (arquitectura, seguridad, funcionalidades)
 
 ---
 
