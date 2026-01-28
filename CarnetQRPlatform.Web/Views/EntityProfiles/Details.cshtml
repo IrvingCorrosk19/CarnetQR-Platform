@@ -57,7 +57,8 @@
     <div class="card-body">
         @if (cards.Any())
         {
-            <table class="table table-bordered table-striped">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
                         <th>Número de Carnet</th>
@@ -88,6 +89,7 @@
                     }
                 </tbody>
             </table>
+            </div>
         }
         else
         {
