@@ -96,20 +96,37 @@ public class SpecialtiesController : Controller
                 ViewBag.Institutions = institutions.Where(i => i.IsActive).OrderBy(i => i.Name).ToList();
             }
             
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            // Log detallado de errores del ModelState
+            var allErrors = new List<string>();
+            foreach (var key in ModelState.Keys)
             {
-                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-                return Json(new { success = false, message = string.Join(" ", errors) });
+                var errors = ModelState[key].Errors;
+                if (errors.Count > 0)
+                {
+                    foreach (var error in errors)
+                    {
+                        var errorMsg = $"{key}: {error.ErrorMessage}";
+                        if (string.IsNullOrEmpty(error.ErrorMessage) && error.Exception != null)
+                        {
+                            errorMsg = $"{key}: {error.Exception.Message}";
+                        }
+                        allErrors.Add(errorMsg);
+                        _logger.LogWarning("[Specialties/Create POST] Error en {Key}: {Error}", key, errorMsg);
+                    }
+                }
             }
-            return View(specialty);
-        }
-        {
-            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-            _logger.LogWarning("[Specialties/Create POST] ModelState inválido. Errores: {Errors}", string.Join(" | ", errors));
+            
+            _logger.LogWarning("[Specialties/Create POST] ModelState inválido. Total errores: {Count}, Errores: {Errors}", 
+                allErrors.Count, string.Join(" | ", allErrors));
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
-                return Json(new { success = false, message = string.Join(" ", errors) });
+                var errorMessage = string.Join(" ", allErrors);
+                if (string.IsNullOrEmpty(errorMessage))
+                {
+                    errorMessage = "Por favor, complete todos los campos requeridos.";
+                }
+                return Json(new { success = false, message = errorMessage });
             }
             return View(specialty);
         }
