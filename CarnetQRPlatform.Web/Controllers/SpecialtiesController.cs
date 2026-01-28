@@ -68,8 +68,12 @@ public class SpecialtiesController : Controller
         _logger.LogInformation("[Specialties/Create POST] Iniciando creación. Usuario: {User}, Nombre: {Name}, InstitutionId: {InstitutionId}, IsActive: {IsActive}",
             User.Identity?.Name, specialty.Name, specialty.InstitutionId, specialty.IsActive);
 
-        // Remover propiedades de navegación del ModelState
+        // Remover propiedades de navegación del ModelState para evitar validaciones innecesarias
         ModelState.Remove(nameof(specialty.Institution));
+        ModelState.Remove(nameof(specialty.Doctors));
+        ModelState.Remove(nameof(specialty.Id));
+        ModelState.Remove(nameof(specialty.CreatedAt));
+        ModelState.Remove(nameof(specialty.UpdatedAt));
 
         // Si es SuperAdmin, validar que haya seleccionado una institución
         if (User.IsInRole(Roles.SuperAdmin))
@@ -80,11 +84,25 @@ public class SpecialtiesController : Controller
                 _logger.LogWarning("[Specialties/Create POST] SuperAdmin no seleccionó institución");
                 ModelState.AddModelError(nameof(specialty.InstitutionId), "Debe seleccionar una institución.");
             }
+            else
+            {
+                // Verificar que la institución existe
+                var institution = await _institutionService.GetByIdAsync(specialty.InstitutionId);
+                if (institution == null)
+                {
+                    _logger.LogWarning("[Specialties/Create POST] Institución no encontrada: {InstitutionId}", specialty.InstitutionId);
+                    ModelState.AddModelError(nameof(specialty.InstitutionId), "La institución seleccionada no existe.");
+                }
+            }
         }
         else
         {
             var tenantId = _tenantProvider.GetCurrentTenantId();
             _logger.LogInformation("[Specialties/Create POST] Usuario no-SuperAdmin. TenantId: {TenantId}", tenantId);
+            if (tenantId.HasValue)
+            {
+                specialty.InstitutionId = tenantId.Value;
+            }
         }
 
         if (!ModelState.IsValid)
