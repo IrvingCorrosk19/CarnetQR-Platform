@@ -86,7 +86,9 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  DESPLIEGUE COMPLETADO" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Aplicación disponible en: http://164.68.99.83" -ForegroundColor Green
+Write-Host "Aplicación disponible en: http://164.68.99.83:8001" -ForegroundColor Green
+Write-Host ""
+Write-Host "NOTA: Puerto cambiado a 8001 para evitar conflictos con otras aplicaciones" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Para ver logs en tiempo real:" -ForegroundColor Yellow
 Write-Host "  docker logs -f carnetqr_web" -ForegroundColor Gray

@@ -54,7 +54,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  REBUILD COMPLETADO" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Aplicacion disponible en: http://164.68.99.83" -ForegroundColor Green
+Write-Host "Aplicacion disponible en: http://164.68.99.83:8001" -ForegroundColor Green
 Write-Host ""
 Write-Host "Para ver logs en tiempo real:" -ForegroundColor Yellow
 Write-Host "  docker logs -f carnetqr_web" -ForegroundColor Gray
