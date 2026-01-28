@@ -22,6 +22,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
     public DbSet<CardTemplate> CardTemplates { get; set; }
     public DbSet<EventRecord> EventRecords { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<Specialty> Specialties { get; set; }
+    public DbSet<Doctor> Doctors { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -35,6 +37,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
         ConfigureEventRecord(builder);
         ConfigureAuditLog(builder);
         ConfigureAppUser(builder);
+        ConfigureSpecialty(builder);
+        ConfigureDoctor(builder);
 
         // Query filters for multi-tenant entities (applied dynamically via service layer)
         // Note: Global query filters are static, so we handle filtering in SaveChanges
@@ -266,12 +270,18 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.InstitutionId);
             entity.HasIndex(e => e.EntityProfileId);
+            entity.HasIndex(e => e.DoctorId);
             entity.HasIndex(e => e.ScheduledAt);
 
             entity.HasOne(e => e.Institution)
                 .WithMany(i => i.EventRecords)
                 .HasForeignKey(e => e.InstitutionId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Doctor)
+                .WithMany()
+                .HasForeignKey(e => e.DoctorId)
+                .OnDelete(DeleteBehavior.SetNull); // Si se elimina el médico, el evento queda sin médico asignado
 
             entity.HasOne(e => e.EntityProfile)
                 .WithMany(ep => ep.EventRecords)
@@ -315,6 +325,50 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole, str
                 .HasForeignKey(e => e.InstitutionId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired(false); // Allow null for SuperAdmin users
+        });
+    }
+
+    private void ConfigureSpecialty(ModelBuilder builder)
+    {
+        builder.Entity<Specialty>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.InstitutionId);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            // Índice único por institución + nombre (permite el mismo nombre en diferentes instituciones)
+            entity.HasIndex(e => new { e.InstitutionId, e.Name }).IsUnique();
+
+            entity.HasOne(e => e.Institution)
+                .WithMany()
+                .HasForeignKey(e => e.InstitutionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private void ConfigureDoctor(ModelBuilder builder)
+    {
+        builder.Entity<Doctor>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.InstitutionId);
+            entity.HasIndex(e => e.SpecialtyId);
+            entity.HasIndex(e => new { e.InstitutionId, e.FirstName, e.LastName });
+
+            entity.Property(e => e.FirstName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.Phone).HasMaxLength(50);
+            entity.Property(e => e.LicenseNumber).HasMaxLength(50);
+
+            entity.HasOne(e => e.Institution)
+                .WithMany(i => i.Doctors)
+                .HasForeignKey(e => e.InstitutionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Specialty)
+                .WithMany(s => s.Doctors)
+                .HasForeignKey(e => e.SpecialtyId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

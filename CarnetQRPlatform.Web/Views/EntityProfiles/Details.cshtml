@@ -1,6 +1,6 @@
 @model CarnetQRPlatform.Domain.Entities.EntityProfile
 @{
-    ViewData["Title"] = "Detalle de Entidad";
+    ViewData["Title"] = "Detalle de Paciente";
     var cards = ViewBag.Cards as IEnumerable<CarnetQRPlatform.Domain.Entities.Card> ?? Enumerable.Empty<CarnetQRPlatform.Domain.Entities.Card>();
     var institution = ViewBag.Institution as CarnetQRPlatform.Domain.Entities.Institution;
 }
@@ -9,7 +9,7 @@
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-user me-2"></i>
-            Detalle de Entidad
+            Detalle de Paciente
         </h3>
     </div>
     <div class="card-body">
@@ -30,8 +30,8 @@
             @if (!string.IsNullOrEmpty(Model.PhotoPath))
             {
                 <div class="col-md-4 text-center">
-                    <img src="@Model.PhotoPath" alt="Foto de la entidad" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
-                    <p class="text-muted small mt-2">Foto de la Entidad</p>
+                    <img src="@Model.PhotoPath" alt="Foto del paciente" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                    <p class="text-muted small mt-2">Foto del Paciente</p>
                 </div>
             }
         </div>
@@ -93,7 +93,7 @@
         {
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
-                Esta entidad no tiene carnets asociados. Haz clic en "Generar Carnet" para crear uno.
+                Este paciente no tiene carnets asociados. Haz clic en "Generar Carnet" para crear uno.
             </div>
         }
     </div>

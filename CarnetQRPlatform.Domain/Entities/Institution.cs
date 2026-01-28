@@ -32,6 +32,7 @@ public class Institution : BaseEntity
     public ICollection<Card> Cards { get; set; } = new List<Card>();
     public ICollection<CardTemplate> CardTemplates { get; set; } = new List<CardTemplate>();
     public ICollection<EventRecord> EventRecords { get; set; } = new List<EventRecord>();
+    public ICollection<Doctor> Doctors { get; set; } = new List<Doctor>();
 }
 
 public enum QrPublicDisplayMode

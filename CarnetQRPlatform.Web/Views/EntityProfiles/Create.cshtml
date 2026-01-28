@@ -1,7 +1,7 @@
 @model CarnetQRPlatform.Domain.Entities.EntityProfile
 @using CarnetQRPlatform.Domain.Constants
 @{
-    ViewData["Title"] = "Nueva Entidad";
+    ViewData["Title"] = "Nuevo Paciente";
     var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
     var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
     var photoEnabled = ViewBag.PhotoEnabled as bool? ?? false;
@@ -11,7 +11,7 @@
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-user-plus me-2"></i>
-            Nueva Entidad
+            Nuevo Paciente
         </h3>
     </div>
     <form asp-action="Create" method="post" id="createEntityForm" enctype="multipart/form-data">
@@ -97,7 +97,7 @@
             <div class="form-group mb-4">
                 <div class="form-check">
                     <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
-                    <label asp-for="IsActive" class="form-check-label">Entidad Activa</label>
+                    <label asp-for="IsActive" class="form-check-label">Paciente Activo</label>
                 </div>
             </div>
             
@@ -127,7 +127,7 @@
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Crear Entidad
+                <i class="fas fa-save"></i> Crear Paciente
             </button>
             <a asp-action="Index" class="btn btn-secondary">
                 <i class="fas fa-times"></i> Cancelar
@@ -243,13 +243,13 @@
                         if (response.success) {
                             window.location.href = response.redirectUrl || '@Url.Action("Index", "EntityProfiles")';
                         } else {
-                            alert(response.message || 'Error al crear la entidad');
-                            $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Crear Entidad');
+                            alert(response.message || 'Error al crear el paciente');
+                            $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Crear Paciente');
                         }
                     },
                     error: function(xhr) {
                         var response = xhr.responseJSON;
-                        var errorMsg = response?.message || 'Error al crear la entidad';
+                        var errorMsg = response?.message || 'Error al crear el paciente';
                         
                         // Mostrar error específico de foto si existe
                         if (response?.errors && response.errors.PhotoFile) {
@@ -259,7 +259,7 @@
                         }
                         
                         alert(errorMsg);
-                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Crear Entidad');
+                        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Crear Paciente');
                     }
                 });
             });

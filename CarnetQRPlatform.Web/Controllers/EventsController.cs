@@ -2,9 +2,11 @@ using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
+using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
 namespace CarnetQRPlatform.Web.Controllers;
@@ -15,26 +17,32 @@ public class EventsController : Controller
     private readonly IEventService _eventService;
     private readonly IEntityProfileService _entityProfileService;
     private readonly IInstitutionService _institutionService;
+    private readonly IDoctorService _doctorService;
     private readonly ITenantProvider _tenantProvider;
     private readonly IAuditService _auditService;
     private readonly UserManager<AppUser> _userManager;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<EventsController> _logger;
 
     public EventsController(
         IEventService eventService,
         IEntityProfileService entityProfileService,
         IInstitutionService institutionService,
+        IDoctorService doctorService,
         ITenantProvider tenantProvider,
         IAuditService auditService,
         UserManager<AppUser> userManager,
+        ApplicationDbContext context,
         ILogger<EventsController> logger)
     {
         _eventService = eventService;
         _entityProfileService = entityProfileService;
         _institutionService = institutionService;
+        _doctorService = doctorService;
         _tenantProvider = tenantProvider;
         _auditService = auditService;
         _userManager = userManager;
+        _context = context;
         _logger = logger;
     }
 
@@ -54,6 +62,7 @@ public class EventsController : Controller
 
         // Cargar entidades según el rol del usuario
         await LoadEntityProfilesForView();
+        await LoadDoctorsForView();
 
         return View(eventRecord);
     }
@@ -70,6 +79,7 @@ public class EventsController : Controller
         ModelState.Remove(nameof(eventRecord.InstitutionId));
         ModelState.Remove(nameof(eventRecord.Institution)); // Remover también la propiedad de navegación
         ModelState.Remove(nameof(eventRecord.EntityProfile)); // Remover la propiedad de navegación EntityProfile
+        ModelState.Remove(nameof(eventRecord.Doctor)); // Remover la propiedad de navegación Doctor
         
         // Validar EntityProfileId antes de continuar
         if (eventRecord.EntityProfileId == Guid.Empty)
@@ -94,6 +104,7 @@ public class EventsController : Controller
             
             // Recargar entidades si hay error de validación
             await LoadEntityProfilesForView();
+            await LoadDoctorsForView();
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -163,6 +174,7 @@ public class EventsController : Controller
             
             // Recargar entidades si hay error
             await LoadEntityProfilesForView();
+            await LoadDoctorsForView();
             
             ModelState.AddModelError("", errorMsg);
             return View(eventRecord);
@@ -189,6 +201,33 @@ public class EventsController : Controller
             var entities = await _entityProfileService.GetAllAsync();
             ViewBag.EntityProfiles = entities.Where(e => e.IsActive).OrderBy(e => e.LastName).ThenBy(e => e.FirstName).ToList();
         }
+    }
+
+    private async Task LoadDoctorsForView()
+    {
+        // Cargar todos los médicos activos según el rol del usuario
+        // Necesitamos incluir la especialidad, así que usamos el contexto directamente
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+        var tenantId = _tenantProvider.GetCurrentTenantId();
+        
+        var query = _context.Doctors
+            .Include(d => d.Specialty)
+            .Include(d => d.Institution)
+            .Where(d => d.IsActive)
+            .AsQueryable();
+        
+        // Aplicar filtro de tenant si no es SuperAdmin
+        if (!isSuperAdmin && tenantId.HasValue)
+        {
+            query = query.Where(d => d.InstitutionId == tenantId.Value);
+        }
+        
+        var doctors = await query
+            .OrderBy(d => d.LastName)
+            .ThenBy(d => d.FirstName)
+            .ToListAsync();
+        
+        ViewBag.Doctors = doctors;
     }
 
     [HttpPost]
@@ -313,6 +352,7 @@ public class EventsController : Controller
         if (!ModelState.IsValid)
         {
             await LoadEntityProfilesForView();
+            await LoadDoctorsForView();
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
@@ -326,6 +366,7 @@ public class EventsController : Controller
         {
             // Actualizar campos editables
             existingEvent.EntityProfileId = eventRecord.EntityProfileId;
+            existingEvent.DoctorId = eventRecord.DoctorId; // Actualizar médico asignado
             existingEvent.ScheduledAt = eventRecord.ScheduledAt;
             existingEvent.Notes = eventRecord.Notes;
 
@@ -371,6 +412,7 @@ public class EventsController : Controller
             }
 
             await LoadEntityProfilesForView();
+            await LoadDoctorsForView();
             ModelState.AddModelError("", errorMsg);
             return View(eventRecord);
         }

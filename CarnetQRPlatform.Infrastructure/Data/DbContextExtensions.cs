@@ -50,5 +50,10 @@ public static class DbContextExtensions
 
         return context.AuditLogs;
     }
+
+    public static IQueryable<Doctor> GetTenantDoctors(this ApplicationDbContext context, ITenantProvider tenantProvider)
+    {
+        return context.Doctors.ApplyTenantFilter(tenantProvider);
+    }
 }
 

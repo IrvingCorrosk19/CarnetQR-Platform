@@ -1,0 +1,109 @@
+@model CarnetQRPlatform.Domain.Entities.Specialty
+@using CarnetQRPlatform.Domain.Constants
+@{
+    ViewData["Title"] = "Nueva Especialidad";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+    var tenantId = ViewBag.TenantId as Guid?;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-stethoscope me-2"></i>
+            Nueva Especialidad
+        </h3>
+    </div>
+    <form asp-action="Create" method="post" id="createSpecialtyForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            @if (!isSuperAdmin)
+            {
+                <input type="hidden" asp-for="InstitutionId" value="@Guid.Empty" />
+            }
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <h5 class="mb-3"><i class="fas fa-building me-2"></i>Datos de la Institución</h5>
+            <hr />
+
+            @* Selector de empresa solo para SuperAdmin *@
+            @if (isSuperAdmin && institutions != null)
+            {
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label asp-for="InstitutionId" class="form-label">Empresa <span class="text-danger">*</span></label>
+                            <select asp-for="InstitutionId" class="form-select" required>
+                                <option value="">-- Seleccione una empresa --</option>
+                                @foreach (var institution in institutions)
+                                {
+                                    <option value="@institution.Id">@institution.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="InstitutionId" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    La especialidad será asignada automáticamente a su institución.
+                </div>
+            }
+
+            <hr class="my-4" />
+            <h5 class="mb-3"><i class="fas fa-stethoscope me-2"></i>Datos de la Especialidad</h5>
+            <hr />
+
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="form-group mb-4">
+                        <label asp-for="Name" class="form-label">Nombre de la Especialidad <span class="text-danger">*</span></label>
+                        <input asp-for="Name" class="form-control" placeholder="Ej: Cardiología" required maxlength="200" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="Description" class="form-label">Descripción</label>
+                <textarea asp-for="Description" class="form-control" rows="3" placeholder="Descripción de la especialidad"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-4">
+                <div class="form-check">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
+                    <label asp-for="IsActive" class="form-check-label">
+                        Activa
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Crear Especialidad
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            $('#createSpecialtyForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Creando especialidad...',
+                    successMessage: 'Especialidad creada exitosamente'
+                });
+            });
+        });
+    </script>
+}

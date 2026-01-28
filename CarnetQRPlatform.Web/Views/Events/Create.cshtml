@@ -1,7 +1,7 @@
 @model CarnetQRPlatform.Domain.Entities.EventRecord
 @using CarnetQRPlatform.Domain.Constants
 @{
-    ViewData["Title"] = "Nuevo Evento";
+    ViewData["Title"] = "Nueva Cita";
     var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
     var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
     var entityProfiles = ViewBag.EntityProfiles as IEnumerable<CarnetQRPlatform.Domain.Entities.EntityProfile>;
@@ -11,7 +11,7 @@
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-calendar-plus me-2"></i>
-            Nuevo Evento
+            Nueva Cita
         </h3>
     </div>
     <form asp-action="Create" method="post" id="createEventForm">
@@ -31,21 +31,21 @@
                             <option value="@institution.Id">@institution.Name</option>
                         }
                     </select>
-                    <small class="form-text text-muted">Seleccione una empresa para filtrar las entidades.</small>
+                    <small class="form-text text-muted">Seleccione una empresa para filtrar los pacientes.</small>
                 </div>
             }
 
             <div class="form-group mb-4">
-                <label asp-for="EntityProfileId" class="form-label">Entidad <span class="text-danger">*</span></label>
+                <label asp-for="EntityProfileId" class="form-label">Paciente <span class="text-danger">*</span></label>
                 @if (Model.EntityProfileId != Guid.Empty)
                 {
                     <input type="hidden" asp-for="EntityProfileId" />
-                    <input type="text" class="form-control" value="Seleccionada desde la lista" readonly />
+                    <input type="text" class="form-control" value="Seleccionado desde la lista" readonly />
                 }
                 else
                 {
                     <select asp-for="EntityProfileId" class="form-select" id="EntityProfileId" required>
-                        <option value="">-- Seleccione una entidad --</option>
+                        <option value="">-- Seleccione un paciente --</option>
                         @if (entityProfiles != null)
                         {
                             @foreach (var entity in entityProfiles)
@@ -59,8 +59,46 @@
                     <span asp-validation-for="EntityProfileId" class="text-danger"></span>
                     @if (entityProfiles == null || !entityProfiles.Any())
                     {
-                        <small class="form-text text-warning">No hay entidades disponibles. Debe crear entidades primero.</small>
+                        <small class="form-text text-warning">No hay pacientes disponibles. Debe crear pacientes primero.</small>
                     }
+                }
+            </div>
+
+            @{
+                var doctors = ViewBag.Doctors as IEnumerable<CarnetQRPlatform.Domain.Entities.Doctor>;
+            }
+            <div class="form-group mb-4">
+                <label asp-for="DoctorId" class="form-label">
+                    <i class="fas fa-user-md me-2"></i>Médico Asignado
+                </label>
+                <select asp-for="DoctorId" class="form-select" id="DoctorId" style="font-size: 0.95rem;">
+                    <option value="">-- Sin médico asignado (opcional) --</option>
+                    @if (doctors != null && doctors.Any())
+                    {
+                        @foreach (var doctor in doctors)
+                        {
+                            <option value="@doctor.Id" data-institution-id="@doctor.InstitutionId">
+                                @($"{doctor.FirstName} {doctor.LastName}") | Especialidad: @(doctor.Specialty?.Name ?? "Sin especialidad")
+                            </option>
+                        }
+                    }
+                    else
+                    {
+                        <option value="" disabled>No hay médicos disponibles</option>
+                    }
+                </select>
+                <span asp-validation-for="DoctorId" class="text-danger"></span>
+                <small class="form-text text-muted">
+                    <i class="fas fa-info-circle me-1"></i>Seleccione un médico para asignar a la cita. La especialidad se muestra junto al nombre del médico.
+                </small>
+                @if (doctors != null && doctors.Any())
+                {
+                    <div id="selectedDoctorInfo" class="mt-2 p-2 bg-light rounded" style="display: none;">
+                        <small class="text-muted">
+                            <i class="fas fa-check-circle text-success me-1"></i>
+                            <span id="selectedDoctorText"></span>
+                        </small>
+                    </div>
                 }
             </div>
 
@@ -68,18 +106,18 @@
                 <label asp-for="ScheduledAt" class="form-label">Fecha y Hora Programada</label>
                 <input asp-for="ScheduledAt" type="datetime-local" class="form-control" required />
                 <span asp-validation-for="ScheduledAt" class="text-danger"></span>
-                <small class="form-text text-muted">Seleccione la fecha y hora en que se realizará el evento.</small>
+                <small class="form-text text-muted">Seleccione la fecha y hora en que se realizará la cita.</small>
             </div>
 
             <div class="form-group mb-4">
                 <label asp-for="Notes" class="form-label">Notas</label>
-                <textarea asp-for="Notes" class="form-control" rows="4" placeholder="Información adicional sobre el evento"></textarea>
+                <textarea asp-for="Notes" class="form-control" rows="4" placeholder="Información adicional sobre la cita"></textarea>
                 <span asp-validation-for="Notes" class="text-danger"></span>
             </div>
         </div>
         <div class="card-footer">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Crear Evento
+                <i class="fas fa-save"></i> Crear Cita
             </button>
             <a asp-action="Index" class="btn btn-secondary">
                 <i class="fas fa-times"></i> Cancelar
@@ -95,20 +133,19 @@
             @if (isSuperAdmin)
             {
                 <text>
-                // Filtrar entidades por institución para SuperAdmin
+                // Filtrar pacientes y médicos por institución para SuperAdmin
                 $('#InstitutionFilter').on('change', function() {
                     var selectedInstitutionId = $(this).val();
                     var $entitySelect = $('#EntityProfileId');
-                    var currentValue = $entitySelect.val();
+                    var $doctorSelect = $('#DoctorId');
                     
+                    // Filtrar pacientes
                     if (selectedInstitutionId) {
-                        // Filtrar opciones por institución
                         $entitySelect.find('option').each(function() {
                             var $option = $(this);
                             var institutionId = $option.data('institution-id');
                             
                             if ($option.val() === '') {
-                                // Mantener la opción por defecto
                                 $option.show();
                             } else if (institutionId === selectedInstitutionId) {
                                 $option.show();
@@ -117,24 +154,107 @@
                             }
                         });
                     } else {
-                        // Mostrar todas las opciones
                         $entitySelect.find('option').show();
                     }
                     
-                    // Si la entidad seleccionada no coincide con el filtro, limpiar selección
-                    var selectedOption = $entitySelect.find('option:selected');
-                    if (selectedInstitutionId && selectedOption.data('institution-id') !== selectedInstitutionId) {
+                    // Filtrar médicos
+                    if (selectedInstitutionId) {
+                        $doctorSelect.find('option').each(function() {
+                            var $option = $(this);
+                            var institutionId = $option.data('institution-id');
+                            
+                            if ($option.val() === '') {
+                                $option.show();
+                            } else if (institutionId === selectedInstitutionId) {
+                                $option.show();
+                            } else {
+                                $option.hide();
+                            }
+                        });
+                    } else {
+                        $doctorSelect.find('option').show();
+                    }
+                    
+                    // Si el paciente seleccionado no coincide con el filtro, limpiar selección
+                    var selectedEntityOption = $entitySelect.find('option:selected');
+                    if (selectedInstitutionId && selectedEntityOption.data('institution-id') !== selectedInstitutionId) {
                         $entitySelect.val('');
+                    }
+                    
+                    // Si el médico seleccionado no coincide con el filtro, limpiar selección
+                    var selectedDoctorOption = $doctorSelect.find('option:selected');
+                    if (selectedInstitutionId && selectedDoctorOption.data('institution-id') !== selectedInstitutionId) {
+                        $doctorSelect.val('');
                     }
                 });
                 </text>
             }
             
+            // Filtrar médicos cuando se selecciona un paciente (para usuarios no-SuperAdmin)
+            @if (!isSuperAdmin)
+            {
+                <text>
+                $('#EntityProfileId').on('change', function() {
+                    var selectedEntityId = $(this).val();
+                    var $doctorSelect = $('#DoctorId');
+                    
+                    if (selectedEntityId) {
+                        // Obtener la institución del paciente seleccionado
+                        var selectedOption = $(this).find('option:selected');
+                        var entityInstitutionId = selectedOption.data('institution-id');
+                        
+                        // Filtrar médicos por institución
+                        $doctorSelect.find('option').each(function() {
+                            var $option = $(this);
+                            var doctorInstitutionId = $option.data('institution-id');
+                            
+                            if ($option.val() === '') {
+                                $option.show();
+                            } else if (doctorInstitutionId === entityInstitutionId) {
+                                $option.show();
+                            } else {
+                                $option.hide();
+                            }
+                        });
+                        
+                        // Si el médico seleccionado no coincide con la institución del paciente, limpiar selección
+                        var selectedDoctorOption = $doctorSelect.find('option:selected');
+                        if (selectedDoctorOption.data('institution-id') !== entityInstitutionId) {
+                            $doctorSelect.val('');
+                        }
+                    } else {
+                        // Mostrar todos los médicos si no hay paciente seleccionado
+                        $doctorSelect.find('option').show();
+                    }
+                });
+                </text>
+            }
+            
+            // Mostrar información del médico seleccionado
+            $('#DoctorId').on('change', function() {
+                var selectedOption = $(this).find('option:selected');
+                var doctorText = selectedOption.text();
+                var doctorInfo = $('#selectedDoctorInfo');
+                var doctorTextSpan = $('#selectedDoctorText');
+                
+                if ($(this).val() && doctorText !== '-- Sin médico asignado (opcional) --') {
+                    doctorTextSpan.text('Médico seleccionado: ' + doctorText);
+                    doctorInfo.fadeIn();
+                } else {
+                    doctorInfo.fadeOut();
+                }
+            });
+            
+            // Trigger change si hay un valor preseleccionado
+            if ($('#DoctorId').val()) {
+                $('#DoctorId').trigger('change');
+            }
+            
             $('#createEventForm').on('submit', function(e) {
                 e.preventDefault();
                 submitFormAjax(this, {
-                    loadingMessage: 'Creando evento...',
-                    successMessage: 'Evento creado exitosamente'
+                    loadingMessage: 'Creando cita...',
+                    successMessage: 'Cita creada exitosamente'
                 });
             });
         });

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CarnetQRPlatform.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260128011702_AddSpecialtyAndDoctor")]
+    partial class AddSpecialtyAndDoctor
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -406,9 +409,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("DoctorId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("EntityProfileId")
                         .HasColumnType("uuid");
 
@@ -431,8 +431,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DoctorId");
 
                     b.HasIndex("EntityProfileId");
 
@@ -573,9 +571,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("InstitutionId")
-                        .HasColumnType("uuid");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -592,9 +587,7 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstitutionId");
-
-                    b.HasIndex("InstitutionId", "Name")
+                    b.HasIndex("Name")
                         .IsUnique();
 
                     b.ToTable("Specialties");
@@ -775,7 +768,7 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
             modelBuilder.Entity("CarnetQRPlatform.Domain.Entities.Doctor", b =>
                 {
                     b.HasOne("CarnetQRPlatform.Domain.Entities.Institution", "Institution")
-                        .WithMany("Doctors")
+                        .WithMany()
                         .HasForeignKey("InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -804,11 +797,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
 
             modelBuilder.Entity("CarnetQRPlatform.Domain.Entities.EventRecord", b =>
                 {
-                    b.HasOne("CarnetQRPlatform.Domain.Entities.Doctor", "Doctor")
-                        .WithMany()
-                        .HasForeignKey("DoctorId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("CarnetQRPlatform.Domain.Entities.EntityProfile", "EntityProfile")
                         .WithMany("EventRecords")
                         .HasForeignKey("EntityProfileId")
@@ -820,8 +808,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
                         .HasForeignKey("InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Doctor");
 
                     b.Navigation("EntityProfile");
 
@@ -836,17 +822,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("InstitutionType");
-                });
-
-            modelBuilder.Entity("CarnetQRPlatform.Domain.Entities.Specialty", b =>
-                {
-                    b.HasOne("CarnetQRPlatform.Domain.Entities.Institution", "Institution")
-                        .WithMany()
-                        .HasForeignKey("InstitutionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Institution");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -912,8 +887,6 @@ namespace CarnetQRPlatform.Infrastructure.Migrations
                     b.Navigation("CardTemplates");
 
                     b.Navigation("Cards");
-
-                    b.Navigation("Doctors");
 
                     b.Navigation("EntityProfiles");
 

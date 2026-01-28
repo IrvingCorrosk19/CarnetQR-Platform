@@ -1,40 +1,67 @@
-@model IEnumerable<CarnetQRPlatform.Domain.Entities.EntityProfile>
+@model IEnumerable<CarnetQRPlatform.Domain.Entities.Doctor>
+@using CarnetQRPlatform.Domain.Constants
 @{
-    ViewData["Title"] = "Pacientes";
+    ViewData["Title"] = "Médicos";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
 }
 
 <div class="card fade-in">
     <div class="card-header">
         <h3 class="card-title">
-            <i class="fas fa-users me-2"></i>
-            Gestión de Pacientes
+            <i class="fas fa-user-md me-2"></i>
+            Gestión de Médicos
         </h3>
         <div class="card-tools">
             <a asp-action="Create" class="btn btn-light btn-sm">
-                <i class="fas fa-plus"></i> Nuevo Paciente
+                <i class="fas fa-plus"></i> Nuevo Médico
             </a>
         </div>
     </div>
     <div class="card-body">
-        <table id="entitiesTable" class="table table-bordered table-striped">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <table id="doctorsTable" class="table table-bordered table-striped">
             <thead>
                 <tr>
-                    <th>Identificación</th>
+                    @if (isSuperAdmin)
+                    {
+                        <th>Institución</th>
+                    }
                     <th>Nombre</th>
+                    <th>Especialidad</th>
                     <th>Email</th>
                     <th>Teléfono</th>
+                    <th>Licencia</th>
                     <th>Estado</th>
-                    <th style="width: 280px;">Acciones</th>
+                    <th style="width: 200px;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var item in Model)
                 {
                     <tr>
-                        <td>@(item.IdentificationNumber ?? "-")</td>
-                        <td>@($"{item.FirstName} {item.LastName}")</td>
+                        @if (isSuperAdmin)
+                        {
+                            <td>@(item.Institution?.Name ?? "-")</td>
+                        }
+                        <td>@item.FirstName @item.LastName</td>
+                        <td>@(item.Specialty?.Name ?? "-")</td>
                         <td>@(item.Email ?? "-")</td>
                         <td>@(item.Phone ?? "-")</td>
+                        <td>@(item.LicenseNumber ?? "-")</td>
                         <td>
                             @if (item.IsActive)
                             {
@@ -47,21 +74,20 @@
                         </td>
                         <td>
                             <div class="d-flex gap-2 flex-wrap">
-                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm" title="Ver detalles">
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm" title="Ver Detalles">
                                     <i class="fas fa-eye me-1"></i> Ver
                                 </a>
                                 <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-primary btn-sm" title="Editar">
                                     <i class="fas fa-edit me-1"></i> Editar
                                 </a>
-                                <form asp-action="ToggleActive" method="post" class="d-inline form-toggle-active">
+                                <form asp-action="ToggleActive" asp-route-id="@item.Id" method="post" class="d-inline form-toggle-active">
                                     @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@item.Id" />
                                     <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-warning" : "btn-success")" title="@(item.IsActive ? "Desactivar" : "Activar")">
                                         <i class="fas fa-@(item.IsActive ? "ban" : "check") me-1"></i>
                                         @(item.IsActive ? "Desactivar" : "Activar")
                                     </button>
                                 </form>
-                                <button type="button" class="btn btn-danger btn-sm delete-entity-btn" data-id="@item.Id" data-name="@($"{item.FirstName} {item.LastName}")" title="Eliminar">
+                                <button type="button" class="btn btn-danger btn-sm delete-doctor-btn" data-id="@item.Id" data-name="@($"{item.FirstName} {item.LastName}")" title="Eliminar">
                                     <i class="fas fa-trash me-1"></i> Eliminar
                                 </button>
                             </div>
@@ -77,8 +103,10 @@
     @Html.AntiForgeryToken()
     <script>
         $(document).ready(function () {
-            $('#entitiesTable').DataTable({
-                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+            $('#doctorsTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
+                },
                 "responsive": true,
                 "pageLength": 25
             });
@@ -86,8 +114,7 @@
             // Toggle active con AJAX
             $('.form-toggle-active').on('submit', function(e) {
                 e.preventDefault();
-                var form = this;
-                submitFormAjax(form, {
+                submitFormAjax(this, {
                     loadingMessage: 'Actualizando estado...',
                     successMessage: 'Estado actualizado exitosamente',
                     successCallback: function() {
@@ -96,17 +123,14 @@
                 });
             });
 
-            // Manejar eliminación de pacientes
-            $(document).on('click', '.delete-entity-btn', function() {
-                console.log('=== FRONTEND: Delete button clicked ===');
-                var entityId = $(this).data('id');
-                var entityName = $(this).data('name');
-                console.log('Entity ID:', entityId);
-                console.log('Entity Name:', entityName);
+            // Manejar eliminación de médicos
+            $(document).on('click', '.delete-doctor-btn', function() {
+                var doctorId = $(this).data('id');
+                var doctorName = $(this).data('name');
                 
                 Swal.fire({
                     title: '¿Estás seguro?',
-                    html: `¿Deseas eliminar al paciente <strong>${entityName}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                    html: `¿Deseas eliminar al médico <strong>${doctorName}</strong>?<br><br>Esta acción no se puede deshacer.`,
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
@@ -116,37 +140,21 @@
                     showLoaderOnConfirm: true,
                     preConfirm: function() {
                         return new Promise(function(resolve, reject) {
-                            console.log('=== FRONTEND: Starting AJAX request ===');
                             var token = $('input[name="__RequestVerificationToken"]').val();
-                            console.log('Token found:', token ? 'Yes' : 'No');
-                            console.log('URL:', '@Url.Action("Delete", "EntityProfiles")');
                             
                             $.ajax({
-                                url: '@Url.Action("Delete", "EntityProfiles")',
+                                url: '@Url.Action("Delete", "Doctors")',
                                 type: 'POST',
                                 data: {
-                                    id: entityId,
+                                    id: doctorId,
                                     __RequestVerificationToken: token
                                 },
-                                headers: {
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                beforeSend: function() {
-                                    console.log('=== FRONTEND: AJAX beforeSend ===');
-                                },
                                 success: function(response) {
-                                    console.log('=== FRONTEND DELETE SUCCESS ===');
-                                    console.log('Response:', response);
-                                    console.log('Response type:', typeof response);
-                                    console.log('Response.success:', response.success);
-                                    console.log('Response.message:', response.message);
-                                    console.log('=============================');
-                                    
                                     if (response.success) {
                                         Swal.fire({
                                             icon: 'success',
                                             title: '¡Eliminado!',
-                                            text: response.message || 'Paciente eliminado exitosamente.',
+                                            text: response.message || 'Médico eliminado exitosamente.',
                                             timer: 2000,
                                             showConfirmButton: false
                                         }).then(function() {
@@ -157,51 +165,31 @@
                                             }
                                         });
                                     } else {
-                                        console.log('Response indicates failure');
                                         Swal.fire({
                                             icon: 'error',
                                             title: 'Error',
-                                            text: response.message || 'No se pudo eliminar al paciente.'
+                                            text: response.message || 'No se pudo eliminar el médico.'
                                         });
                                     }
                                     resolve();
                                 },
-                                error: function(xhr, status, error) {
-                                    console.error('=== FRONTEND DELETE ERROR ===');
-                                    console.error('Status:', status);
-                                    console.error('Error:', error);
-                                    console.error('Status Code:', xhr.status);
-                                    console.error('Status Text:', xhr.statusText);
-                                    console.error('XHR Response:', xhr.responseText);
-                                    console.error('XHR Response Type:', xhr.responseJSON ? 'JSON' : 'Text');
-                                    if (xhr.responseJSON) {
-                                        console.error('Response JSON:', xhr.responseJSON);
-                                    }
-                                    console.error('===========================');
-                                    
-                                    var errorMsg = 'Ocurrió un error al eliminar al paciente.';
+                                error: function(xhr) {
+                                    var errorMsg = 'Ocurrió un error al eliminar el médico.';
                                     if (xhr.responseJSON && xhr.responseJSON.message) {
                                         errorMsg = xhr.responseJSON.message;
-                                        console.log('Error message from server:', errorMsg);
                                     }
-                                    
                                     Swal.fire({
                                         icon: 'error',
                                         title: 'Error',
                                         text: errorMsg
                                     });
-                                    reject(error);
-                                },
-                                complete: function() {
-                                    console.log('=== FRONTEND: AJAX complete ===');
+                                    resolve();
                                 }
                             });
                         });
-                    },
-                    allowOutsideClick: function() { return !Swal.isLoading(); }
+                    }
                 });
             });
         });
     </script>
 }
-

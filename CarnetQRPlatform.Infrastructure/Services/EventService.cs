@@ -19,7 +19,12 @@ public class EventService : IEventService
 
     public async Task<IEnumerable<EventRecord>> GetAllAsync()
     {
-        var query = _context.EventRecords.Include(e => e.EntityProfile).Include(e => e.Institution).AsQueryable();
+        var query = _context.EventRecords
+            .Include(e => e.EntityProfile)
+            .Include(e => e.Institution)
+            .Include(e => e.Doctor)
+            .ThenInclude(d => d.Specialty)
+            .AsQueryable();
         return await query.ApplyTenantFilter(_tenantProvider).OrderByDescending(e => e.ScheduledAt).ToListAsync();
     }
 
@@ -45,7 +50,12 @@ public class EventService : IEventService
 
     public async Task<EventRecord?> GetByIdAsync(Guid id)
     {
-        var query = _context.EventRecords.Include(e => e.EntityProfile).Include(e => e.Institution).AsQueryable();
+        var query = _context.EventRecords
+            .Include(e => e.EntityProfile)
+            .Include(e => e.Institution)
+            .Include(e => e.Doctor)
+            .ThenInclude(d => d.Specialty)
+            .AsQueryable();
         return await query.ApplyTenantFilter(_tenantProvider).FirstOrDefaultAsync(e => e.Id == id);
     }
 
@@ -86,6 +96,24 @@ public class EventService : IEventService
         {
             throw new InvalidOperationException(
                 $"Entity profile with ID {eventRecord.EntityProfileId} not found");
+        }
+
+        // Validar DoctorId si se proporciona
+        if (eventRecord.DoctorId.HasValue)
+        {
+            var doctor = await _context.Doctors
+                .FirstOrDefaultAsync(d => d.Id == eventRecord.DoctorId.Value && d.IsActive);
+            
+            if (doctor == null)
+            {
+                throw new InvalidOperationException("El médico seleccionado no existe o está inactivo.");
+            }
+            
+            // Validar que el médico pertenece a la misma institución del evento
+            if (doctor.InstitutionId != eventRecord.InstitutionId)
+            {
+                throw new InvalidOperationException("El médico seleccionado no pertenece a la misma institución del evento.");
+            }
         }
         
         // Para usuarios no-SuperAdmin, validar que EntityProfile pertenece al mismo tenant
@@ -145,8 +173,27 @@ public class EventService : IEventService
             }
         }
 
+        // Validar DoctorId si se proporciona
+        if (eventRecord.DoctorId.HasValue)
+        {
+            var doctor = await _context.Doctors
+                .FirstOrDefaultAsync(d => d.Id == eventRecord.DoctorId.Value && d.IsActive);
+            
+            if (doctor == null)
+            {
+                throw new InvalidOperationException("El médico seleccionado no existe o está inactivo.");
+            }
+            
+            // Validar que el médico pertenece a la misma institución del evento
+            if (doctor.InstitutionId != existingEvent.InstitutionId)
+            {
+                throw new InvalidOperationException("El médico seleccionado no pertenece a la misma institución del evento.");
+            }
+        }
+
         // Actualizar solo campos permitidos (InstitutionId se preserva, no se puede cambiar)
         existingEvent.EntityProfileId = eventRecord.EntityProfileId;
+        existingEvent.DoctorId = eventRecord.DoctorId; // Actualizar médico asignado
         existingEvent.ScheduledAt = eventRecord.ScheduledAt;
         existingEvent.Notes = eventRecord.Notes;
         existingEvent.UpdatedAt = DateTime.UtcNow;

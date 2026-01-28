@@ -1,0 +1,533 @@
+@model CarnetQRPlatform.Domain.Entities.Doctor
+@using CarnetQRPlatform.Domain.Constants
+@{
+    ViewData["Title"] = "Nuevo Médico";
+    var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+    var institutions = ViewBag.Institutions as IEnumerable<CarnetQRPlatform.Domain.Entities.Institution>;
+    var specialties = ViewBag.Specialties as IEnumerable<CarnetQRPlatform.Domain.Entities.Specialty>;
+}
+
+<div class="card fade-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-user-md me-2"></i>
+            Nuevo Médico
+        </h3>
+    </div>
+    <form asp-action="Create" method="post" id="createDoctorForm">
+        <div class="card-body">
+            @Html.AntiForgeryToken()
+            @if (!isSuperAdmin)
+            {
+                <input type="hidden" asp-for="InstitutionId" value="@Guid.Empty" />
+            }
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <h5 class="mb-3"><i class="fas fa-building me-2"></i>Datos de la Institución</h5>
+            <hr />
+
+            @* Selector de empresa para SuperAdmin, solo lectura para InstitutionAdmin *@
+            @if (isSuperAdmin && institutions != null)
+            {
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group mb-4">
+                            <label asp-for="InstitutionId" class="form-label">Empresa <span class="text-danger">*</span></label>
+                            <select asp-for="InstitutionId" class="form-select" required>
+                                <option value="">-- Seleccione una empresa --</option>
+                                @foreach (var institution in institutions)
+                                {
+                                    <option value="@institution.Id">@institution.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="InstitutionId" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @* Para InstitutionAdmin, mostrar la empresa pre-seleccionada y deshabilitada *@
+                var currentInstitution = institutions?.FirstOrDefault();
+                if (currentInstitution != null)
+                {
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group mb-4">
+                                <label asp-for="InstitutionId" class="form-label">Empresa</label>
+                                <input type="hidden" asp-for="InstitutionId" value="@currentInstitution.Id" />
+                                <input type="text" class="form-control" value="@currentInstitution.Name" readonly disabled />
+                                <small class="form-text text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>El médico será asignado a su institución.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        El médico será asignado automáticamente a su institución.
+                    </div>
+                }
+            }
+
+            <hr class="my-4" />
+            <h5 class="mb-3"><i class="fas fa-user-md me-2"></i>Datos del Médico</h5>
+            <hr />
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="FirstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input asp-for="FirstName" class="form-control" placeholder="Ingrese el nombre" required maxlength="100" />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="LastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input asp-for="LastName" class="form-control" placeholder="Ingrese el apellido" required maxlength="100" />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="SpecialtyId" class="form-label">
+                            Especialidad <span class="text-danger">*</span>
+                            <button type="button" class="btn btn-sm btn-outline-primary ms-2" data-bs-toggle="modal" data-bs-target="#specialtyModal" title="Gestionar Especialidades">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                        </label>
+                        <select asp-for="SpecialtyId" class="form-select" id="SpecialtyId" required>
+                            <option value="">-- Seleccione una especialidad --</option>
+                            @if (specialties != null)
+                            {
+                                @foreach (var specialty in specialties)
+                                {
+                                    <option value="@specialty.Id">@specialty.Name</option>
+                                }
+                            }
+                        </select>
+                        <span asp-validation-for="SpecialtyId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="LicenseNumber" class="form-label">Número de Licencia</label>
+                        <input asp-for="LicenseNumber" class="form-control" placeholder="Número de licencia médica" maxlength="50" />
+                        <span asp-validation-for="LicenseNumber" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Email" class="form-label">Correo Electrónico</label>
+                        <input asp-for="Email" type="email" class="form-control" placeholder="correo@ejemplo.com" maxlength="256" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-4">
+                        <label asp-for="Phone" class="form-label">Teléfono</label>
+                        <input asp-for="Phone" class="form-control" placeholder="+507 1234-5678" maxlength="50" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-4">
+                <div class="form-check">
+                    <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
+                    <label asp-for="IsActive" class="form-check-label">
+                        Médico Activo
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Crear Médico
+            </button>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Modal para Gestionar Especialidades -->
+<div class="modal fade" id="specialtyModal" tabindex="-1" aria-labelledby="specialtyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="specialtyModalLabel">
+                        <i class="fas fa-stethoscope me-2"></i>Gestionar Especialidades
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-primary" id="btnNewSpecialty">
+                            <i class="fas fa-plus me-2"></i>Nueva Especialidad
+                        </button>
+                    </div>
+                    
+                    <div id="specialtyListContainer">
+                        <table class="table table-striped" id="specialtiesTable">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Descripción</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="specialtiesTableBody">
+                                <tr>
+                                    <td colspan="4" class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Cargando...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Formulario para Crear/Editar -->
+                    <div id="specialtyFormContainer" style="display:none;">
+                        <hr />
+                        <form id="specialtyForm">
+                            <input type="hidden" id="specialtyId" />
+                            <div class="mb-3">
+                                <label for="specialtyName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="specialtyName" required maxlength="200" />
+                            </div>
+                            <div class="mb-3">
+                                <label for="specialtyDescription" class="form-label">Descripción</label>
+                                <textarea class="form-control" id="specialtyDescription" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="specialtyIsActive" checked>
+                                    <label class="form-check-label" for="specialtyIsActive">
+                                        Activa
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Guardar
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="btnCancelSpecialty">
+                                    <i class="fas fa-times me-2"></i>Cancelar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            $('#createDoctorForm').on('submit', function(e) {
+                e.preventDefault();
+                submitFormAjax(this, {
+                    loadingMessage: 'Creando médico...',
+                    successMessage: 'Médico creado exitosamente'
+                });
+            });
+
+            // Cargar especialidades cuando se abre el modal
+            $('#specialtyModal').on('show.bs.modal', function() {
+                loadSpecialties();
+            });
+
+            // Botón nuevo especialidad
+            $('#btnNewSpecialty').on('click', function() {
+                resetSpecialtyForm();
+                $('#specialtyFormContainer').slideDown();
+                $('#btnNewSpecialty').hide();
+            });
+
+            // Botón cancelar formulario
+            $('#btnCancelSpecialty').on('click', function() {
+                $('#specialtyFormContainer').slideUp();
+                $('#btnNewSpecialty').show();
+                resetSpecialtyForm();
+            });
+
+            // Submit del formulario
+            $('#specialtyForm').on('submit', function(e) {
+                e.preventDefault();
+                saveSpecialty();
+            });
+
+            function loadSpecialties() {
+                $.ajax({
+                    url: '/api/SpecialtiesApi',
+                    type: 'GET',
+                    success: function(specialties) {
+                        var tbody = $('#specialtiesTableBody');
+                        tbody.empty();
+                        
+                        if (specialties.length === 0) {
+                            tbody.append('<tr><td colspan="4" class="text-center text-muted">No hay especialidades registradas.</td></tr>');
+                            return;
+                        }
+
+                        var isSuperAdmin = @(isSuperAdmin ? "true" : "false");
+                        
+                        specialties.forEach(function(specialty) {
+                            var statusBadge = specialty.isActive 
+                                ? '<span class="badge bg-success">Activa</span>' 
+                                : '<span class="badge bg-secondary">Inactiva</span>';
+                            
+                            var row = '<tr data-id="' + specialty.id + '">' +
+                                '<td>' + specialty.name + '</td>' +
+                                '<td>' + (specialty.description || '-') + '</td>' +
+                                '<td>' + statusBadge + '</td>' +
+                                '<td>';
+                            
+                            if (isSuperAdmin) {
+                                row += '<button class="btn btn-sm btn-primary edit-specialty-btn" data-id="' + specialty.id + '" title="Editar">' +
+                                    '<i class="fas fa-edit"></i>' +
+                                '</button> ' +
+                                '<button class="btn btn-sm ' + (specialty.isActive ? 'btn-warning' : 'btn-success') + ' toggle-specialty-btn" data-id="' + specialty.id + '" data-active="' + specialty.isActive + '" title="' + (specialty.isActive ? 'Desactivar' : 'Activar') + '">' +
+                                    '<i class="fas fa-' + (specialty.isActive ? 'ban' : 'check') + '"></i>' +
+                                '</button> ' +
+                                '<button class="btn btn-sm btn-danger delete-specialty-btn" data-id="' + specialty.id + '" data-name="' + specialty.name + '" title="Eliminar">' +
+                                    '<i class="fas fa-trash"></i>' +
+                                '</button>';
+                            } else {
+                                row += '<span class="text-muted">Solo lectura</span>';
+                            }
+                            
+                            row += '</td></tr>';
+                            tbody.append(row);
+                        });
+                    },
+                    error: function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'No se pudieron cargar las especialidades.'
+                        });
+                    }
+                });
+            }
+
+            function resetSpecialtyForm() {
+                $('#specialtyId').val('');
+                $('#specialtyName').val('');
+                $('#specialtyDescription').val('');
+                $('#specialtyIsActive').prop('checked', true);
+            }
+
+            function saveSpecialty() {
+                var specialtyData = {
+                    id: $('#specialtyId').val() || '00000000-0000-0000-0000-000000000000',
+                    name: $('#specialtyName').val(),
+                    description: $('#specialtyDescription').val(),
+                    isActive: $('#specialtyIsActive').is(':checked')
+                };
+
+                var url = '/api/SpecialtiesApi';
+                var method = $('#specialtyId').val() ? 'PUT' : 'POST';
+
+                $.ajax({
+                    url: url + (method === 'PUT' ? '/' + $('#specialtyId').val() : ''),
+                    type: method,
+                    contentType: 'application/json',
+                    data: JSON.stringify(specialtyData),
+                    success: function(response) {
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Guardado!',
+                                text: response.message,
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                            $('#specialtyFormContainer').slideUp();
+                            $('#btnNewSpecialty').show();
+                            resetSpecialtyForm();
+                            loadSpecialties();
+                            loadSpecialtiesForSelect();
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message
+                            });
+                        }
+                    },
+                    error: function(xhr) {
+                        var errorMsg = 'Error al guardar la especialidad.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        }
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg
+                        });
+                    }
+                });
+            }
+
+            function loadSpecialtiesForSelect() {
+                $.ajax({
+                    url: '/api/SpecialtiesApi',
+                    type: 'GET',
+                    success: function(specialties) {
+                        var select = $('#SpecialtyId');
+                        var currentValue = select.val();
+                        select.empty();
+                        select.append('<option value="">-- Seleccione una especialidad --</option>');
+                        
+                        specialties.filter(s => s.isActive).forEach(function(specialty) {
+                            var option = $('<option></option>')
+                                .attr('value', specialty.id)
+                                .text(specialty.name);
+                            if (specialty.id === currentValue) {
+                                option.attr('selected', 'selected');
+                            }
+                            select.append(option);
+                        });
+                    }
+                });
+            }
+
+            var isSuperAdmin = @(isSuperAdmin ? "true" : "false");
+            
+            // Editar especialidad (solo SuperAdmin)
+            if (isSuperAdmin) {
+                $(document).on('click', '.edit-specialty-btn', function() {
+                    var specialtyId = $(this).data('id');
+                    $.ajax({
+                        url: '/api/SpecialtiesApi/' + specialtyId,
+                        type: 'GET',
+                        success: function(specialty) {
+                            $('#specialtyId').val(specialty.id);
+                            $('#specialtyName').val(specialty.name);
+                            $('#specialtyDescription').val(specialty.description || '');
+                            $('#specialtyIsActive').prop('checked', specialty.isActive);
+                            $('#specialtyFormContainer').slideDown();
+                            $('#btnNewSpecialty').hide();
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'No se pudo cargar la especialidad.'
+                            });
+                        }
+                    });
+                });
+
+                // Toggle activo/inactivo (solo SuperAdmin)
+                $(document).on('click', '.toggle-specialty-btn', function() {
+                    var specialtyId = $(this).data('id');
+                    var isActive = $(this).data('active');
+                    
+                    $.ajax({
+                        url: '/api/SpecialtiesApi/' + specialtyId + '/toggle-active',
+                        type: 'POST',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: '¡Actualizado!',
+                                    text: response.message,
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                });
+                                loadSpecialties();
+                                loadSpecialtiesForSelect();
+                            }
+                        },
+                        error: function(xhr) {
+                            var errorMsg = 'Error al actualizar el estado.';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMsg = xhr.responseJSON.message;
+                            }
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: errorMsg
+                            });
+                        }
+                    });
+                });
+
+                // Eliminar especialidad (solo SuperAdmin)
+                $(document).on('click', '.delete-specialty-btn', function() {
+                    var specialtyId = $(this).data('id');
+                    var specialtyName = $(this).data('name');
+                    
+                    Swal.fire({
+                        title: '¿Estás seguro?',
+                        html: `¿Deseas eliminar la especialidad <strong>${specialtyName}</strong>?<br><br>Esta acción no se puede deshacer.`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d33',
+                        cancelButtonColor: '#3085d6',
+                        confirmButtonText: 'Sí, eliminar',
+                        cancelButtonText: 'Cancelar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            $.ajax({
+                                url: '/api/SpecialtiesApi/' + specialtyId,
+                                type: 'DELETE',
+                                success: function(response) {
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: '¡Eliminado!',
+                                            text: response.message,
+                                            timer: 2000,
+                                            showConfirmButton: false
+                                        });
+                                        loadSpecialties();
+                                        loadSpecialtiesForSelect();
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: response.message
+                                        });
+                                    }
+                                },
+                                error: function(xhr) {
+                                    var errorMsg = 'Error al eliminar la especialidad.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errorMsg = xhr.responseJSON.message;
+                                    }
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: errorMsg
+                                    });
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+}
+
