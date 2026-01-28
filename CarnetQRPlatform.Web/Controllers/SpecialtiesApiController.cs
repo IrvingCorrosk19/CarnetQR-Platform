@@ -1,3 +1,4 @@
+using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
@@ -12,13 +13,16 @@ namespace CarnetQRPlatform.Web.Controllers;
 public class SpecialtiesApiController : ControllerBase
 {
     private readonly ISpecialtyService _specialtyService;
+    private readonly ITenantProvider _tenantProvider;
     private readonly ILogger<SpecialtiesApiController> _logger;
 
     public SpecialtiesApiController(
         ISpecialtyService specialtyService,
+        ITenantProvider tenantProvider,
         ILogger<SpecialtiesApiController> logger)
     {
         _specialtyService = specialtyService;
+        _tenantProvider = tenantProvider;
         _logger = logger;
     }
 
@@ -43,14 +47,65 @@ public class SpecialtiesApiController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Specialty specialty)
     {
-        _logger.LogInformation("[SpecialtiesApi/Create] Iniciando creación vía API. Usuario: {User}, Nombre: {Name}, IsActive: {IsActive}",
-            User.Identity?.Name, specialty.Name, specialty.IsActive);
+        _logger.LogInformation("[SpecialtiesApi/Create] Iniciando creación vía API. Usuario: {User}, Nombre: {Name}, InstitutionId: {InstitutionId}, IsActive: {IsActive}",
+            User.Identity?.Name, specialty.Name, specialty.InstitutionId, specialty.IsActive);
+
+        // Remover propiedades de navegación del ModelState
+        ModelState.Remove(nameof(specialty.Institution));
+        ModelState.Remove(nameof(specialty.Doctors));
+        ModelState.Remove(nameof(specialty.Id));
+        ModelState.Remove(nameof(specialty.CreatedAt));
+        ModelState.Remove(nameof(specialty.UpdatedAt));
+
+        // Validar InstitutionId basado en el rol del usuario
+        var isSuperAdmin = User.IsInRole(Roles.SuperAdmin);
+        if (isSuperAdmin)
+        {
+            if (specialty.InstitutionId == Guid.Empty)
+            {
+                _logger.LogWarning("[SpecialtiesApi/Create] SuperAdmin no proporcionó InstitutionId");
+                ModelState.AddModelError(nameof(specialty.InstitutionId), "Debe especificar una institución.");
+            }
+        }
+        else
+        {
+            // Para usuarios no-SuperAdmin, obtener InstitutionId del tenant
+            var tenantId = _tenantProvider.GetCurrentTenantId();
+            if (tenantId.HasValue)
+            {
+                specialty.InstitutionId = tenantId.Value;
+                _logger.LogInformation("[SpecialtiesApi/Create] InstitutionId asignado desde tenant: {InstitutionId}", specialty.InstitutionId);
+            }
+            else
+            {
+                _logger.LogWarning("[SpecialtiesApi/Create] No se pudo obtener InstitutionId del tenant");
+                ModelState.AddModelError(nameof(specialty.InstitutionId), "No se pudo determinar la institución.");
+            }
+        }
 
         if (!ModelState.IsValid)
         {
-            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-            _logger.LogWarning("[SpecialtiesApi/Create] ModelState inválido. Errores: {Errors}", string.Join(" | ", errors));
-            return BadRequest(new { success = false, message = string.Join(" ", errors) });
+            var allErrors = new List<string>();
+            foreach (var key in ModelState.Keys)
+            {
+                var errors = ModelState[key].Errors;
+                if (errors.Count > 0)
+                {
+                    foreach (var error in errors)
+                    {
+                        var errorMsg = $"{key}: {error.ErrorMessage}";
+                        if (string.IsNullOrEmpty(error.ErrorMessage) && error.Exception != null)
+                        {
+                            errorMsg = $"{key}: {error.Exception.Message}";
+                        }
+                        allErrors.Add(errorMsg);
+                        _logger.LogWarning("[SpecialtiesApi/Create] Error en {Key}: {Error}", key, errorMsg);
+                    }
+                }
+            }
+            _logger.LogWarning("[SpecialtiesApi/Create] ModelState inválido. Total errores: {Count}, Errores: {Errors}", 
+                allErrors.Count, string.Join(" | ", allErrors));
+            return BadRequest(new { success = false, message = string.Join(" ", allErrors) });
         }
 
         try

@@ -163,14 +163,14 @@
 </div>
 
 <!-- Modal para Gestionar Especialidades -->
-<div class="modal fade" id="specialtyModal" tabindex="-1" aria-labelledby="specialtyModalLabel" aria-hidden="true">
+<div class="modal fade" id="specialtyModal" tabindex="-1" aria-labelledby="specialtyModalLabel">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="specialtyModalLabel">
                         <i class="fas fa-stethoscope me-2"></i>Gestionar Especialidades
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -341,8 +341,20 @@
                     id: $('#specialtyId').val() || '00000000-0000-0000-0000-000000000000',
                     name: $('#specialtyName').val(),
                     description: $('#specialtyDescription').val(),
-                    isActive: $('#specialtyIsActive').is(':checked')
+                    isActive: $('#specialtyIsActive').is(':checked'),
+                    institutionId: $('#InstitutionId').val() || '@(isSuperAdmin ? "" : (ViewBag.TenantId?.ToString() ?? ""))'
                 };
+                
+                // Si es SuperAdmin y no hay InstitutionId, mostrar error
+                var isSuperAdmin = @(isSuperAdmin ? "true" : "false");
+                if (isSuperAdmin && !specialtyData.institutionId) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Debe seleccionar una institución antes de crear la especialidad.'
+                    });
+                    return;
+                }
 
                 var url = '/api/SpecialtiesApi';
                 var method = $('#specialtyId').val() ? 'PUT' : 'POST';
