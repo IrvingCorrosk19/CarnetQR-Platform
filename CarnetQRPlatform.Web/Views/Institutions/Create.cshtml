@@ -60,13 +60,13 @@
                 <div class="col-md-4">
                     <div class="form-group mb-4">
                         <label asp-for="InstitutionTypeId" class="form-label">
-                            Tipo de Institución <span class="text-danger">*</span>
+                            Tipo de Institución
                             <button type="button" class="btn btn-sm btn-outline-primary ms-2" data-bs-toggle="modal" data-bs-target="#institutionTypeModal" title="Gestionar Tipos">
                                 <i class="fas fa-cog"></i>
                             </button>
                         </label>
-                        <select asp-for="InstitutionTypeId" class="form-control" id="InstitutionTypeId" required>
-                            <option value="">-- Seleccione un tipo --</option>
+                        <select asp-for="InstitutionTypeId" class="form-control" id="InstitutionTypeId">
+                            <option value="">-- Seleccione un tipo (opcional) --</option>
                             @if (ViewBag.InstitutionTypes != null)
                             {
                                 @foreach (var type in (List<CarnetQRPlatform.Domain.Entities.InstitutionType>)ViewBag.InstitutionTypes)
@@ -76,6 +76,7 @@
                             }
                         </select>
                         <span asp-validation-for="InstitutionTypeId" class="text-danger"></span>
+                        <small class="form-text text-muted">El tipo de institución es opcional. Solo las instituciones de tipo "Clínica" u "Hospital" pueden tener especialidades médicas.</small>
                     </div>
                 </div>
             </div>

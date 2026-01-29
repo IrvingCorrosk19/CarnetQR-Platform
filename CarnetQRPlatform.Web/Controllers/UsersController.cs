@@ -142,16 +142,16 @@ public class UsersController : Controller
         }
         else
         {
+            // VALIDACIÓN CRÍTICA DE SEGURIDAD: SuperAdmin NO puede crear otros SuperAdmin
+            if (model.Role == Roles.SuperAdmin)
+            {
+                ModelState.AddModelError(nameof(model.Role), "No se pueden crear usuarios con rol SuperAdmin. Este rol solo puede asignarse manualmente por el administrador del sistema.");
+            }
+
             // Validar que se seleccionó una institución si el rol no es SuperAdmin
             if (model.Role != Roles.SuperAdmin && model.InstitutionId == Guid.Empty)
             {
                 ModelState.AddModelError(nameof(model.InstitutionId), "Debe seleccionar una empresa para este rol.");
-            }
-
-            // Validar que SuperAdmin no tenga institución
-            if (model.Role == Roles.SuperAdmin && model.InstitutionId != Guid.Empty)
-            {
-                ModelState.AddModelError(nameof(model.InstitutionId), "El SuperAdmin no puede tener una empresa asignada.");
             }
         }
 
@@ -534,16 +534,16 @@ public class UsersController : Controller
         }
         else
         {
+            // VALIDACIÓN CRÍTICA DE SEGURIDAD: SuperAdmin NO puede cambiar el rol a SuperAdmin
+            if (model.Role == Roles.SuperAdmin)
+            {
+                ModelState.AddModelError(nameof(model.Role), "No se puede asignar el rol SuperAdmin. Este rol solo puede asignarse manualmente por el administrador del sistema.");
+            }
+
             // Validar que se seleccionó una institución si el rol no es SuperAdmin
             if (model.Role != Roles.SuperAdmin && model.InstitutionId == Guid.Empty)
             {
                 ModelState.AddModelError(nameof(model.InstitutionId), "Debe seleccionar una empresa para este rol.");
-            }
-
-            // Validar que SuperAdmin no tenga institución
-            if (model.Role == Roles.SuperAdmin && model.InstitutionId != Guid.Empty)
-            {
-                ModelState.AddModelError(nameof(model.InstitutionId), "El SuperAdmin no puede tener una empresa asignada.");
             }
         }
 

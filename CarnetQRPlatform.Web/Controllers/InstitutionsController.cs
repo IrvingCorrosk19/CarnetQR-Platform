@@ -2,9 +2,11 @@ using CarnetQRPlatform.Application.Interfaces;
 using CarnetQRPlatform.Application.Services;
 using CarnetQRPlatform.Domain.Constants;
 using CarnetQRPlatform.Domain.Entities;
+using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Security.Claims;
 
@@ -17,6 +19,7 @@ public class InstitutionsController : Controller
     private readonly IInstitutionTypeService _institutionTypeService;
     private readonly UserManager<AppUser> _userManager;
     private readonly IAuditService _auditService;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<InstitutionsController> _logger;
 
     public InstitutionsController(
@@ -24,12 +27,14 @@ public class InstitutionsController : Controller
         IInstitutionTypeService institutionTypeService,
         UserManager<AppUser> userManager,
         IAuditService auditService,
+        ApplicationDbContext context,
         ILogger<InstitutionsController> logger)
     {
         _institutionService = institutionService;
         _institutionTypeService = institutionTypeService;
         _userManager = userManager;
         _auditService = auditService;
+        _context = context;
         _logger = logger;
     }
 
@@ -235,6 +240,11 @@ public class InstitutionsController : Controller
         var institutionTypes = await _institutionTypeService.GetAllAsync();
         ViewBag.InstitutionTypes = institutionTypes.Where(it => it.IsActive).OrderBy(it => it.Name).ToList();
         
+        // Verificar si tiene especialidades para mostrar advertencia
+        var hasSpecialties = await _context.Set<Specialty>()
+            .AnyAsync(s => s.InstitutionId == id);
+        ViewBag.HasSpecialties = hasSpecialties;
+        
         return View(institution);
     }
 
@@ -333,10 +343,37 @@ public class InstitutionsController : Controller
             TempData["SuccessMessage"] = "Empresa actualizada exitosamente.";
             return RedirectToAction(nameof(Index));
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("especialidades") || ex.Message.Contains("tipo de institución"))
+        {
+            _logger.LogWarning(ex, "Business rule violation updating institution: {Message}", ex.Message);
+            var errorMsg = ex.Message;
+            
+            // Recargar datos para la vista
+            var institutionTypes = await _institutionTypeService.GetAllAsync();
+            ViewBag.InstitutionTypes = institutionTypes.Where(it => it.IsActive).OrderBy(it => it.Name).ToList();
+            var hasSpecialties = await _context.Set<Specialty>()
+                .AnyAsync(s => s.InstitutionId == institution.Id);
+            ViewBag.HasSpecialties = hasSpecialties;
+            
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, message = errorMsg });
+            }
+            
+            ModelState.AddModelError(nameof(institution.InstitutionTypeId), errorMsg);
+            return View(institution);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating institution");
             var errorMsg = "Error al actualizar la empresa.";
+            
+            // Recargar datos para la vista
+            var institutionTypes = await _institutionTypeService.GetAllAsync();
+            ViewBag.InstitutionTypes = institutionTypes.Where(it => it.IsActive).OrderBy(it => it.Name).ToList();
+            var hasSpecialties = await _context.Set<Specialty>()
+                .AnyAsync(s => s.InstitutionId == institution.Id);
+            ViewBag.HasSpecialties = hasSpecialties;
             
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {

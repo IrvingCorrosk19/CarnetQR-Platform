@@ -66,6 +66,20 @@ public class AccountController : Controller
             return View(model);
         }
         
+        // VALIDACIÓN CRÍTICA: Verificar que la institución del usuario esté activa (si tiene institución)
+        if (user.InstitutionId.HasValue)
+        {
+            var institution = await _context.Institutions.FindAsync(user.InstitutionId.Value);
+            if (institution != null && !institution.IsActive)
+            {
+                _logger.LogWarning("Login failed: User {Email} belongs to inactive institution {InstitutionName}", 
+                    model.Email, institution.Name);
+                ModelState.AddModelError(string.Empty, 
+                    $"Su institución '{institution.Name}' está desactivada. Contacte al administrador del sistema.");
+                return View(model);
+            }
+        }
+        
         _logger.LogInformation("User found: {Email}, UserName: {UserName}, InstitutionId: {InstitutionId}, IsActive: {IsActive}", 
             user.Email, user.UserName, user.InstitutionId, user.IsActive);
 

@@ -43,7 +43,7 @@
                         <td>@item.Name</td>
                         <td>@(item.Description ?? "-")</td>
                         <td><span class="badge bg-info">@item.CardPrefix</span></td>
-                        <td>@(item.InstitutionType?.ToString() ?? "-")</td>
+                        <td>@(item.InstitutionType?.Name ?? "-")</td>
                         <td>
                             @if (item.IsActive)
                             {
@@ -91,16 +91,51 @@
                 "pageLength": 25
             });
 
-            // Toggle active con AJAX
+            // Toggle active con AJAX - CONFIRMACIÓN AL DESACTIVAR
             $('.form-toggle-active').on('submit', function(e) {
                 e.preventDefault();
-                submitFormAjax(this, {
-                    loadingMessage: 'Actualizando estado...',
-                    successMessage: 'Estado actualizado exitosamente',
-                    successCallback: function() {
-                        location.reload();
-                    }
-                });
+                var form = this;
+                var button = $(form).find('button[type="submit"]');
+                var isActive = button.hasClass('btn-warning'); // Si es btn-warning, está activo y se va a desactivar
+                var institutionName = $(form).closest('tr').find('td:first').text();
+                
+                if (isActive) {
+                    // DESACTIVAR: Requiere confirmación
+                    Swal.fire({
+                        title: '¿Está seguro?',
+                        html: `¿Desea desactivar la institución <strong>${institutionName}</strong>?<br><br>
+                               <strong>Impacto:</strong><br>
+                               • Todos los usuarios de esta institución no podrán hacer login<br>
+                               • No se podrán crear nuevos datos (pacientes, carnets, citas)<br>
+                               • Los datos históricos no se verán afectados<br><br>
+                               Esta acción se puede revertir activando la institución nuevamente.`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d33',
+                        cancelButtonColor: '#3085d6',
+                        confirmButtonText: 'Sí, desactivar',
+                        cancelButtonText: 'Cancelar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            submitFormAjax(form, {
+                                loadingMessage: 'Desactivando institución...',
+                                successMessage: 'Institución desactivada exitosamente',
+                                successCallback: function() {
+                                    location.reload();
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    // ACTIVAR: No requiere confirmación (es seguro)
+                    submitFormAjax(form, {
+                        loadingMessage: 'Activando institución...',
+                        successMessage: 'Institución activada exitosamente',
+                        successCallback: function() {
+                            location.reload();
+                        }
+                    });
+                }
             });
 
             // Manejar eliminación de instituciones

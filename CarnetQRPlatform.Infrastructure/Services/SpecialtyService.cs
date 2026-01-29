@@ -4,6 +4,7 @@ using CarnetQRPlatform.Application.Extensions;
 using CarnetQRPlatform.Domain.Entities;
 using CarnetQRPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 namespace CarnetQRPlatform.Infrastructure.Services;
 
@@ -85,8 +86,9 @@ public class SpecialtyService : ISpecialtyService
         }
 
         System.Diagnostics.Debug.WriteLine($"[SpecialtyService.CreateAsync] Validando institución. InstitutionId: {specialty.InstitutionId}");
-        // Validar que la institución existe
+        // Validar que la institución existe y cargar su tipo
         var institution = await _context.Institutions
+            .Include(i => i.InstitutionType)
             .FirstOrDefaultAsync(i => i.Id == specialty.InstitutionId);
         
         if (institution == null)
@@ -95,6 +97,28 @@ public class SpecialtyService : ISpecialtyService
             throw new InvalidOperationException("La institución seleccionada no existe.");
         }
         System.Diagnostics.Debug.WriteLine($"[SpecialtyService.CreateAsync] Institución válida: {institution.Name}");
+        
+        // VALIDACIÓN CRÍTICA: Solo se pueden asignar especialidades a instituciones médicas (Clínica u Hospital)
+        if (institution.InstitutionTypeId == null || institution.InstitutionType == null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SpecialtyService.CreateAsync] ERROR: La institución '{institution.Name}' no tiene tipo de institución asignado.");
+            throw new InvalidOperationException(
+                $"Las especialidades médicas solo pueden asignarse a instituciones de tipo 'Clínica' o 'Hospital'. " +
+                $"La institución '{institution.Name}' no tiene un tipo de institución médica asignado.");
+        }
+        
+        var institutionTypeName = institution.InstitutionType.Name.Trim();
+        var validMedicalTypes = new[] { "Clínica", "Hospital" };
+        
+        if (!validMedicalTypes.Contains(institutionTypeName, StringComparer.OrdinalIgnoreCase))
+        {
+            System.Diagnostics.Debug.WriteLine($"[SpecialtyService.CreateAsync] ERROR: La institución '{institution.Name}' es de tipo '{institutionTypeName}', que no es un tipo médico válido.");
+            throw new InvalidOperationException(
+                $"Las especialidades médicas solo pueden asignarse a instituciones de tipo 'Clínica' o 'Hospital'. " +
+                $"La institución '{institution.Name}' es de tipo '{institutionTypeName}', que no permite especialidades médicas.");
+        }
+        
+        System.Diagnostics.Debug.WriteLine($"[SpecialtyService.CreateAsync] Institución es de tipo médico válido: {institutionTypeName}");
         
         // Verificar si el nombre ya existe en la misma institución
         var existingSpecialty = await _context.Set<Specialty>()

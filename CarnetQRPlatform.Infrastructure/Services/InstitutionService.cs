@@ -33,7 +33,9 @@ public class InstitutionService : IInstitutionService
         }
 
         // Si no está en caché, obtener de base de datos
+        // SuperAdmin debe ver TODAS las instituciones (sin filtro de tenant)
         var institutions = await _context.Institutions
+            .Include(i => i.InstitutionType)
             .OrderBy(i => i.Name)
             .ToListAsync();
 
@@ -55,7 +57,9 @@ public class InstitutionService : IInstitutionService
         }
 
         // Si no está en caché, obtener de base de datos
-        var institution = await _context.Institutions.FindAsync(id);
+        var institution = await _context.Institutions
+            .Include(i => i.InstitutionType)
+            .FirstOrDefaultAsync(i => i.Id == id);
         
         if (institution != null)
         {
@@ -117,15 +121,75 @@ public class InstitutionService : IInstitutionService
 
     public async Task<Institution> UpdateAsync(Institution institution)
     {
-        institution.UpdatedAt = DateTime.UtcNow;
-        _context.Institutions.Update(institution);
+        // Obtener la institución existente para comparar cambios
+        var existingInstitution = await _context.Institutions
+            .Include(i => i.InstitutionType)
+            .FirstOrDefaultAsync(i => i.Id == institution.Id);
+        
+        if (existingInstitution == null)
+        {
+            throw new ArgumentException("Institution not found");
+        }
+
+        // VALIDACIÓN CRÍTICA: Si la institución tiene especialidades, validar cambios de tipo
+        var hasSpecialties = await _context.Set<Specialty>()
+            .AnyAsync(s => s.InstitutionId == institution.Id);
+        
+        if (hasSpecialties)
+        {
+            // Si tenía tipo médico y ahora no tiene tipo o tiene tipo no médico
+            var hadMedicalType = existingInstitution.InstitutionTypeId.HasValue && 
+                                 existingInstitution.InstitutionType != null &&
+                                 (existingInstitution.InstitutionType.Name == "Clínica" || 
+                                  existingInstitution.InstitutionType.Name == "Hospital");
+            
+            var newType = institution.InstitutionTypeId.HasValue
+                ? await _context.Set<Domain.Entities.InstitutionType>()
+                    .FirstOrDefaultAsync(t => t.Id == institution.InstitutionTypeId.Value)
+                : null;
+            
+            var hasMedicalType = newType != null && 
+                                (newType.Name == "Clínica" || newType.Name == "Hospital");
+            
+            // Si tenía tipo médico y ahora no lo tiene, rechazar
+            if (hadMedicalType && !hasMedicalType)
+            {
+                throw new InvalidOperationException(
+                    "No se puede cambiar el tipo de institución a un tipo no médico porque la institución tiene especialidades médicas asignadas. " +
+                    "Las especialidades solo pueden asignarse a instituciones de tipo 'Clínica' o 'Hospital'.");
+            }
+        }
+
+        // Actualizar campos
+        existingInstitution.Name = institution.Name;
+        existingInstitution.Description = institution.Description;
+        existingInstitution.Email = institution.Email;
+        existingInstitution.Phone = institution.Phone;
+        existingInstitution.Address = institution.Address;
+        existingInstitution.InstitutionTypeId = institution.InstitutionTypeId;
+        existingInstitution.IsActive = institution.IsActive;
+        existingInstitution.PhotoEnabled = institution.PhotoEnabled;
+        existingInstitution.VisibleFields = institution.VisibleFields;
+        existingInstitution.QrPublicDisplayMode = institution.QrPublicDisplayMode;
+        existingInstitution.PatientDataVisibilityConfig = institution.PatientDataVisibilityConfig;
+        existingInstitution.Instructions = institution.Instructions;
+        
+        // Logo se maneja por separado en el controlador
+        if (!string.IsNullOrEmpty(institution.LogoPath))
+        {
+            existingInstitution.LogoPath = institution.LogoPath;
+        }
+        
+        existingInstitution.UpdatedAt = DateTime.UtcNow;
+        
+        _context.Institutions.Update(existingInstitution);
         await _context.SaveChangesAsync();
         
         // Invalidar caché
         await _cacheService.RemoveAsync("institutions_all");
         await _cacheService.RemoveAsync($"institution_{institution.Id}");
         
-        return institution;
+        return existingInstitution;
     }
 
     public async Task<bool> DeleteAsync(Guid id)

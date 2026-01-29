@@ -107,16 +107,50 @@
                 "pageLength": 25
             });
 
-            // Toggle active con AJAX
+            // Toggle active con AJAX - CONFIRMACIÓN AL DESACTIVAR
             $('.form-toggle-active').on('submit', function(e) {
                 e.preventDefault();
-                submitFormAjax(this, {
-                    loadingMessage: 'Actualizando estado...',
-                    successMessage: 'Estado actualizado exitosamente',
-                    successCallback: function() {
-                        location.reload();
-                    }
-                });
+                var form = this;
+                var button = $(form).find('button[type="submit"]');
+                var isActive = button.hasClass('btn-warning'); // Si es btn-warning, está activo y se va a desactivar
+                var userEmail = $(form).closest('tr').find('td:nth-child(2)').text();
+                
+                if (isActive) {
+                    // DESACTIVAR: Requiere confirmación
+                    Swal.fire({
+                        title: '¿Está seguro?',
+                        html: `¿Desea desactivar al usuario <strong>${userEmail}</strong>?<br><br>
+                               <strong>Impacto:</strong><br>
+                               • El usuario no podrá hacer login hasta que sea reactivado<br>
+                               • No se verán afectados los datos creados por este usuario<br><br>
+                               Esta acción se puede revertir activando el usuario nuevamente.`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d33',
+                        cancelButtonColor: '#3085d6',
+                        confirmButtonText: 'Sí, desactivar',
+                        cancelButtonText: 'Cancelar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            submitFormAjax(form, {
+                                loadingMessage: 'Desactivando usuario...',
+                                successMessage: 'Usuario desactivado exitosamente',
+                                successCallback: function() {
+                                    location.reload();
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    // ACTIVAR: No requiere confirmación (es seguro)
+                    submitFormAjax(form, {
+                        loadingMessage: 'Activando usuario...',
+                        successMessage: 'Usuario activado exitosamente',
+                        successCallback: function() {
+                            location.reload();
+                        }
+                    });
+                }
             });
 
             // Manejar eliminación de usuarios

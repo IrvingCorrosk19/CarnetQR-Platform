@@ -26,7 +26,7 @@ public class CreateInstitutionViewModel
     [Display(Name = "Prefijo de Carnet")]
     public string CardPrefix { get; set; } = string.Empty;
 
-    [Required]
+    // InstitutionTypeId es opcional - puede ser null para instituciones sin tipo
     [Display(Name = "Tipo de Institución")]
     public Guid? InstitutionTypeId { get; set; }
 

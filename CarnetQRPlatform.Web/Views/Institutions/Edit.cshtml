@@ -78,7 +78,7 @@
                                 <i class="fas fa-cog"></i>
                             </button>
                         </label>
-                        <select asp-for="InstitutionTypeId" class="form-control" id="InstitutionTypeId" required>
+                        <select asp-for="InstitutionTypeId" class="form-control" id="InstitutionTypeId">
                             <option value="">-- Seleccione un tipo --</option>
                             @if (ViewBag.InstitutionTypes != null)
                             {
@@ -89,6 +89,14 @@
                             }
                         </select>
                         <span asp-validation-for="InstitutionTypeId" class="text-danger"></span>
+                        @if (ViewBag.HasSpecialties == true)
+                        {
+                            <div class="alert alert-warning mt-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Advertencia:</strong> Esta institución tiene especialidades médicas asignadas. 
+                                No se puede cambiar el tipo a un tipo no médico (Clínica u Hospital).
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
