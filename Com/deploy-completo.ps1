@@ -142,8 +142,10 @@ Write-Host ""
 
 # PASO 11: Verificar migraciones aplicadas
 Write-Host "PASO 11: Verificando migraciones en la base de datos..." -ForegroundColor Yellow
-$cmd11 = "docker exec carnetqr_postgres psql -U carnetqruser -d carnetqrdb -c 'SELECT * FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\" DESC LIMIT 10;' 2>&1"
-Write-Host "Ejecutando: $cmd11" -ForegroundColor Gray
+$cmd11 = @"
+docker exec carnetqr_postgres psql -U carnetqruser -d carnetqrdb -c "SELECT * FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\" DESC LIMIT 10;" 2>&1
+"@
+Write-Host "Ejecutando: Verificando migraciones..." -ForegroundColor Gray
 $result11 = & $plink -ssh -pw $password -batch -hostkey $hostkey $hostname $cmd11 2>&1
 Write-Host $result11
 Write-Host ""

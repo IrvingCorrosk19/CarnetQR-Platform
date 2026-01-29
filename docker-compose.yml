@@ -32,9 +32,9 @@ services:
       ASPNETCORE_DATAPROTECTION_PATH: /app/dataprotection-keys
     volumes:
       - carnetqr_dataprotection_keys:/app/dataprotection-keys
-    # Puerto 80 para acceso directo o a través de proxy reverso
+    # Puerto 8001 para evitar conflictos con otras aplicaciones y proxy reverso
     ports:
-      - "80:8080"
+      - "8001:8080"
     networks:
       - carnetqr_net
 
